@@ -1,0 +1,11 @@
+#!/usr/bin/env php
+<?php
+
+define('FCPATH', __DIR__ . DIRECTORY_SEPARATOR . 'public' . DIRECTORY_SEPARATOR);
+
+if (! is_file(FCPATH . 'index.php')) {
+    fwrite(STDERR, "public/index.php not found.\n");
+    exit(1);
+}
+
+require FCPATH . 'index.php';
