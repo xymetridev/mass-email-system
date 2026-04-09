@@ -2,16 +2,23 @@
 
 namespace App\Services;
 
-use App\Models\Campaign;
-use App\Models\Recipient;
-use Illuminate\Http\UploadedFile;
+use CodeIgniter\Database\BaseConnection;
+use CodeIgniter\HTTP\Files\UploadedFile;
+use Config\Database;
 
 class RecipientImportService
 {
+    private BaseConnection $db;
+
+    public function __construct(?BaseConnection $db = null)
+    {
+        $this->db = $db ?? Database::connect();
+    }
+
     /**
      * @return array<string, int>
      */
-    public function importFromTxt(Campaign $campaign, UploadedFile $file, int $insertChunkSize = 500): array
+    public function importFromTxt(int $campaignId, UploadedFile $file, int $insertChunkSize = 500): array
     {
         $summary = [
             'total_rows' => 0,
@@ -24,7 +31,7 @@ class RecipientImportService
         $seenInFile = [];
         $insertBuffer = [];
 
-        $stream = new \SplFileObject($file->getRealPath());
+        $stream = new \SplFileObject((string) $file->getRealPath());
         $stream->setFlags(\SplFileObject::DROP_NEW_LINE);
 
         while (! $stream->eof()) {
@@ -56,22 +63,24 @@ class RecipientImportService
 
             $seenInFile[$email] = true;
             $summary['valid_rows']++;
+            [$firstName, $lastName] = $this->splitName($name);
 
             $insertBuffer[] = [
-                'campaign_id' => $campaign->id,
+                'campaign_id' => $campaignId,
                 'email' => $email,
-                'name' => $name,
-                'created_at' => now(),
-                'updated_at' => now(),
+                'first_name' => $firstName,
+                'last_name' => $lastName,
+                'created_at' => date('Y-m-d H:i:s'),
+                'updated_at' => date('Y-m-d H:i:s'),
             ];
 
             if (count($insertBuffer) >= $insertChunkSize) {
-                $this->flushBuffer($campaign, $insertBuffer, $summary);
+                $this->flushBuffer($campaignId, $insertBuffer, $summary);
             }
         }
 
         if ($insertBuffer !== []) {
-            $this->flushBuffer($campaign, $insertBuffer, $summary);
+            $this->flushBuffer($campaignId, $insertBuffer, $summary);
         }
 
         return $summary;
@@ -91,20 +100,45 @@ class RecipientImportService
     }
 
     /**
+     * @return array{0: ?string, 1: ?string}
+     */
+    private function splitName(?string $name): array
+    {
+        $name = trim((string) $name);
+        if ($name === '') {
+            return [null, null];
+        }
+
+        $parts = preg_split('/\s+/', $name);
+        if (! is_array($parts) || $parts === []) {
+            return [$name, null];
+        }
+
+        $firstName = (string) array_shift($parts);
+        $lastName = $parts !== [] ? implode(' ', $parts) : null;
+
+        return [$firstName, $lastName];
+    }
+
+    /**
      * @param  array<int, array<string, mixed>>  $insertBuffer
      * @param  array<string, int>  $summary
      */
-    private function flushBuffer(Campaign $campaign, array &$insertBuffer, array &$summary): void
+    private function flushBuffer(int $campaignId, array &$insertBuffer, array &$summary): void
     {
         $emails = array_column($insertBuffer, 'email');
 
-        $existingEmails = Recipient::query()
-            ->where('campaign_id', $campaign->id)
+        $existingRows = $this->db->table('recipients')
+            ->select('email')
+            ->where('campaign_id', $campaignId)
             ->whereIn('email', $emails)
-            ->pluck('email')
-            ->map(fn (string $email) => mb_strtolower($email))
-            ->flip()
-            ->all();
+            ->get()
+            ->getResultArray();
+
+        $existingEmails = [];
+        foreach ($existingRows as $row) {
+            $existingEmails[mb_strtolower((string) $row['email'])] = true;
+        }
 
         $rowsToInsert = [];
         foreach ($insertBuffer as $row) {
@@ -117,7 +151,7 @@ class RecipientImportService
         }
 
         if ($rowsToInsert !== []) {
-            Recipient::query()->insertOrIgnore($rowsToInsert);
+            $this->db->table('recipients')->ignore(true)->insertBatch($rowsToInsert);
             $summary['inserted_rows'] += count($rowsToInsert);
         }
 

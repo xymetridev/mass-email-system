@@ -19,9 +19,6 @@ class CampaignDeliveryService
         $this->db = $db ?? Database::connect();
     }
 
-    /**
-     * @return list<array<string, mixed>>
-     */
     public function getRunningCampaigns(): array
     {
         return $this->db->table('campaigns')
@@ -30,74 +27,66 @@ class CampaignDeliveryService
             ->getResultArray();
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
-    public function getSenderConfig(int $senderId): ?array
+    private function getSender(int $senderId): ?array
     {
-        $row = $this->db->table('senders')
-            ->select('id, smtp_host, smtp_port, smtp_user, smtp_pass, smtp_crypto, from_email, from_name')
+        return $this->db->table('sender_accounts')
             ->where('id', $senderId)
             ->get()
             ->getRowArray();
-
-        return $row ?: null;
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
-    public function getTemplate(int $templateId): ?array
+    private function getTemplateByCampaign(int $campaignId): ?array
     {
-        $row = $this->db->table('campaign_templates')
-            ->select('id, subject, html_body, text_body')
-            ->where('id', $templateId)
+        return $this->db->table('templates')
+            ->where('campaign_id', $campaignId)
             ->get()
             ->getRowArray();
-
-        return $row ?: null;
     }
 
-    /**
-     * Claims pending recipients by setting them PROCESSING to prevent duplicates.
-     *
-     * @return list<array<string, mixed>>
-     */
     public function claimPendingRecipients(int $campaignId, int $limit): array
     {
         $limit = max(1, $limit);
-        $claimToken = bin2hex(random_bytes(16));
+        $token = bin2hex(random_bytes(16));
+        $now = date('Y-m-d H:i:s');
 
         $this->db->transStart();
 
-        $candidates = $this->db->table('campaign_recipients')
+        // release stale claim
+        $this->db->table('recipients')
+            ->where('campaign_id', $campaignId)
+            ->where('claimed_by IS NOT NULL')
+            ->where('claimed_at <', date('Y-m-d H:i:s', strtotime('-5 minutes')))
+            ->update([
+                'claimed_by' => null,
+                'claimed_at' => null,
+            ]);
+
+        // ambil kandidat
+        $rows = $this->db->table('recipients')
             ->select('id')
             ->where('campaign_id', $campaignId)
             ->where('status', 'PENDING')
+            ->where('claimed_by IS NULL')
             ->orderBy('id', 'ASC')
             ->limit($limit)
             ->get()
             ->getResultArray();
 
-        $ids = array_map(static fn (array $row): int => (int) $row['id'], $candidates);
+        $ids = array_column($rows, 'id');
 
-        if ($ids !== []) {
-            $builder = $this->db->table('campaign_recipients');
-            $builder->set('status', 'PROCESSING')
-                ->set('claimed_by', $claimToken)
-                ->set('updated_at', date('Y-m-d H:i:s'))
-                ->where('campaign_id', $campaignId)
+        if ($ids) {
+            $this->db->table('recipients')
                 ->whereIn('id', $ids)
-                ->where('status', 'PENDING')
-                ->update();
+                ->where('claimed_by IS NULL')
+                ->update([
+                    'claimed_by' => $token,
+                    'claimed_at' => $now,
+                    'updated_at' => $now,
+                ]);
         }
 
-        $claimed = $this->db->table('campaign_recipients')
-            ->select('id, campaign_id, email, name, status, retry_count')
-            ->where('campaign_id', $campaignId)
-            ->where('claimed_by', $claimToken)
-            ->where('status', 'PROCESSING')
-            ->orderBy('id', 'ASC')
+        $claimed = $this->db->table('recipients')
+            ->where('claimed_by', $token)
             ->get()
             ->getResultArray();
 
@@ -109,101 +98,97 @@ class CampaignDeliveryService
     public function processCampaign(array $campaign, callable $output): void
     {
         $campaignId = (int) $campaign['id'];
-        $senderId = (int) ($campaign['sender_id'] ?? 0);
-        $templateId = (int) ($campaign['template_id'] ?? 0);
+        $senderId = (int) ($campaign['sender_account_id'] ?? 0);
         $batchSize = max(1, (int) ($campaign['batch_size'] ?? 100));
 
-        $sender = $this->getSenderConfig($senderId);
-        $template = $this->getTemplate($templateId);
+        $sender = $this->getSender($senderId);
+        $template = $this->getTemplateByCampaign($campaignId);
 
-        if ($sender === null || $template === null) {
-            $output(sprintf('Campaign #%d skipped: missing sender/template.', $campaignId));
-
+        if (! $sender || ! $template) {
+            $output("Campaign #$campaignId skipped (missing sender/template)");
             return;
         }
 
         $recipients = $this->claimPendingRecipients($campaignId, $batchSize);
 
-        foreach ($recipients as $recipient) {
-            $this->deliverRecipient($campaign, $recipient, $sender, $template, $output);
+        foreach ($recipients as $r) {
+            $this->deliver($campaign, $r, $sender, $template, $output);
         }
 
         $this->markCompletedIfFinished($campaignId);
     }
 
-    private function deliverRecipient(
-        array $campaign,
-        array $recipient,
-        array $sender,
-        array $template,
-        callable $output
-    ): void {
-        $campaignId = (int) $campaign['id'];
-        $recipientId = (int) $recipient['id'];
-        $defaultName = (string) ($campaign['default_name'] ?? 'Customer');
-        $recipientName = trim((string) ($recipient['name'] ?? ''));
-        $toName = $recipientName !== '' ? $recipientName : $defaultName;
+    private function deliver(array $campaign, array $r, array $sender, array $template, callable $output): void
+    {
+        $id = (int) $r['id'];
+        $fullName = trim(((string) ($r['first_name'] ?? '')) . ' ' . ((string) ($r['last_name'] ?? '')));
+        $name = $fullName !== '' ? $fullName : ((string) ($campaign['default_name'] ?? 'Customer'));
 
         $subject = (string) ($template['subject'] ?? '');
-        $htmlBody = str_replace('{{name}}', $toName, (string) ($template['html_body'] ?? ''));
-        $textBody = str_replace('{{name}}', $toName, (string) ($template['text_body'] ?? ''));
+        $htmlBody = str_replace('{{name}}', $name, (string) ($template['body_html'] ?? ''));
+        $textBody = str_replace('{{name}}', $name, (string) ($template['body_text'] ?? ''));
+        $finalBody = $htmlBody !== '' ? $htmlBody : $textBody;
 
         try {
             $email = $this->buildMailer($sender);
-            $email->setFrom((string) $sender['from_email'], (string) ($sender['from_name'] ?? ''));
-            $email->setTo((string) $recipient['email']);
+            $email->setFrom((string) $sender['sender_email'], (string) ($sender['sender_name'] ?? ''));
+            $email->setTo((string) $r['email']);
             $email->setSubject($subject);
-            $email->setMessage($htmlBody !== '' ? $htmlBody : $textBody);
+            $email->setMessage($finalBody);
 
             if ($textBody !== '') {
                 $email->setAltMessage($textBody);
             }
 
             if (! $email->send(false)) {
-                $this->markFailure($recipientId, 'SMTP send returned false', (int) ($recipient['retry_count'] ?? 0));
-                $output(sprintf('Campaign #%d recipient #%d failed.', $campaignId, $recipientId));
-
+                $this->fail($id, 'SMTP failed', (int) ($r['retry_count'] ?? 0));
                 return;
             }
 
-            $this->db->table('campaign_recipients')
-                ->where('id', $recipientId)
+            $now = date('Y-m-d H:i:s');
+            $this->db->table('recipients')
+                ->where('id', $id)
                 ->update([
                     'status' => 'SENT',
-                    'sent_at' => date('Y-m-d H:i:s'),
+                    'sent_at' => $now,
+                    'last_attempt_at' => $now,
                     'last_error' => null,
                     'claimed_by' => null,
-                    'updated_at' => date('Y-m-d H:i:s'),
+                    'claimed_at' => null,
+                    'updated_at' => $now,
                 ]);
 
-            $output(sprintf('Campaign #%d recipient #%d sent.', $campaignId, $recipientId));
+            $output("Recipient $id SENT");
         } catch (Throwable $e) {
-            $this->markFailure($recipientId, $e->getMessage(), (int) ($recipient['retry_count'] ?? 0));
-            $output(sprintf('Campaign #%d recipient #%d error handled.', $campaignId, $recipientId));
+            $this->fail($id, $e->getMessage(), (int) ($r['retry_count'] ?? 0));
         }
     }
 
-    private function markFailure(int $recipientId, string $error, int $currentRetryCount): void
+    private function fail(int $id, string $error, int $retry): void
     {
-        $nextRetry = $currentRetryCount + 1;
-        $newStatus = $nextRetry > 3 ? 'FAILED' : 'PENDING';
+        $max = 3;
+        $next = $retry + 1;
 
-        $this->db->table('campaign_recipients')
-            ->where('id', $recipientId)
+        $status = $next >= $max ? 'FAILED' : 'PENDING';
+
+        $this->db->table('recipients')
+            ->where('id', $id)
             ->update([
-                'status' => $newStatus,
-                'retry_count' => $nextRetry,
+                'status' => $status,
+                'retry_count' => $next,
                 'last_error' => mb_substr($error, 0, 1000),
+                'last_attempt_at' => date('Y-m-d H:i:s'),
                 'claimed_by' => null,
+                'claimed_at' => null,
                 'updated_at' => date('Y-m-d H:i:s'),
             ]);
     }
 
     private function markCompletedIfFinished(int $campaignId): void
     {
-        $remaining = $this->db->table('campaign_recipients')
+        $remaining = $this->db->table('recipients')
             ->where('campaign_id', $campaignId)
-            ->whereNotIn('status', ['SENT', 'FAILED'])
+            ->where('status', 'PENDING')
             ->countAllResults();
 
         if ($remaining === 0) {
@@ -220,18 +205,14 @@ class CampaignDeliveryService
 
     private function buildMailer(array $sender): Email
     {
-        $config = [
+        return Services::email([
             'protocol' => 'smtp',
-            'SMTPHost' => (string) $sender['smtp_host'],
-            'SMTPPort' => (int) $sender['smtp_port'],
-            'SMTPUser' => (string) $sender['smtp_user'],
-            'SMTPPass' => (string) $sender['smtp_pass'],
-            'SMTPCrypto' => (string) ($sender['smtp_crypto'] ?? ''),
+            'SMTPHost' => $sender['smtp_host'],
+            'SMTPPort' => $sender['smtp_port'],
+            'SMTPUser' => $sender['smtp_user'],
+            'SMTPPass' => $sender['smtp_pass'],
+            'SMTPCrypto' => $sender['encryption'] ?? '',
             'mailType' => 'html',
-            'charset' => 'utf-8',
-            'wordWrap' => true,
-        ];
-
-        return Services::email($config, false);
+        ], false);
     }
 }

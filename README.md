@@ -1,30 +1,20 @@
-# Mass Email System (CodeIgniter 4)
+# Mass Email Campaign System (CodeIgniter 4)
 
-This repository is initialized as a fresh, production-safe CodeIgniter 4 project foundation.
+This is an internal mass email campaign system built as a **CodeIgniter 4 modular monolith**:
+- **CI4 HTTP app**: AdminLTE UI for admins/users to manage campaigns
+- **CI4 CLI worker**: cron-driven delivery worker (runs every 1 minute)
+- **MySQL/MariaDB**: single source of truth
+- **SMTP**: configured per sender account
 
-## Getting started
+> **Source of truth:** `SOURCE_OF_TRUTH.md` is the only normative spec for future decisions.
 
-1. Copy environment file:
-   ```bash
-   cp .env.example .env
-   ```
-2. Install dependencies:
-   ```bash
-   composer install
-   ```
-3. Run local server:
-   ```bash
-   php spark serve
-   ```
+## Quick start (dev)
+- Copy env: `cp .env.example .env`
+- Install: `composer install`
+- Run: `php spark serve`
 
-## Project readiness
+## Cron (required)
+Run the delivery worker every minute:
 
-The structure is prepared for:
-- Database migrations and seeds (`app/Database/Migrations`, `app/Database/Seeds`)
-- Domain models (`app/Models`)
-- Services (`app/Services`)
-- Filters (`app/Filters`)
-- Console commands (`app/Commands`)
-- AdminLTE layouts/pages (`app/Views/adminlte`)
-
-No business modules are implemented yet.
+```cron
+* * * * * php /path/to/project/spark cron:deliver-campaigns

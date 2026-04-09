@@ -1,6 +1,6 @@
 <?php
 
-namespace Config;
+namespace App\Config;
 
 use CodeIgniter\Shield\Authorization\Groups;
 

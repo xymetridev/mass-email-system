@@ -10,12 +10,12 @@ class CreateRecipientsTable extends Migration
     {
         $this->forge->addField([
             'id' => [
-                'type'           => 'BIGINT',
+                'type'           => 'INT',
                 'unsigned'       => true,
                 'auto_increment' => true,
             ],
             'campaign_id' => [
-                'type'     => 'BIGINT',
+                'type'     => 'INT',
                 'unsigned' => true,
             ],
             'email' => [
@@ -33,23 +33,11 @@ class CreateRecipientsTable extends Migration
                 'null'       => true,
             ],
             'status' => [
-                'type'       => 'VARCHAR',
-                'constraint' => 30,
-                'default'    => 'pending',
+                'type'       => 'ENUM',
+                'constraint' => ['PENDING', 'SENT', 'FAILED'],
+                'default'    => 'PENDING',
             ],
             'sent_at' => [
-                'type' => 'DATETIME',
-                'null' => true,
-            ],
-            'opened_at' => [
-                'type' => 'DATETIME',
-                'null' => true,
-            ],
-            'clicked_at' => [
-                'type' => 'DATETIME',
-                'null' => true,
-            ],
-            'bounced_at' => [
                 'type' => 'DATETIME',
                 'null' => true,
             ],
@@ -58,6 +46,14 @@ class CreateRecipientsTable extends Migration
                 'null' => true,
             ],
             'updated_at' => [
+                'type' => 'DATETIME',
+                'null' => true,
+            ],
+            'retry_count' => [
+                'type' => 'INT',
+                'default' => 0,
+            ],
+            'last_attempt_at' => [
                 'type' => 'DATETIME',
                 'null' => true,
             ],

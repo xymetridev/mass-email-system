@@ -14,15 +14,14 @@ class CampaignModel extends Model
     protected $protectFields    = true;
 
     protected $allowedFields = [
+        'user_id',
         'name',
         'subject',
-        'sender_name',
-        'sender_email',
-        'reply_to_email',
-        'body_html',
-        'body_text',
+        'sender_account_id',
+        'default_name',
         'status',
-        'scheduled_at',
+        'batch_size',
+        'completed_at',
     ];
 
     protected bool $allowEmptyInserts = false;
@@ -36,18 +35,29 @@ class CampaignModel extends Model
     protected $updatedField  = 'updated_at';
 
     protected $validationRules = [
-        'name'          => 'required|max_length[150]|is_unique[campaigns.name,id,{id}]',
+        'user_id'       => 'required|is_natural_no_zero',
+        'name'          => 'required|max_length[150]',
         'subject'       => 'required|max_length[255]',
-        'sender_name'   => 'required|max_length[150]',
-        'sender_email'  => 'required|valid_email|max_length[255]',
-        'reply_to_email'=> 'permit_empty|valid_email|max_length[255]',
-        'body_html'     => 'permit_empty',
-        'body_text'     => 'permit_empty',
-        'status'        => 'required|in_list[draft,scheduled,sending,completed,cancelled]',
-        'scheduled_at'  => 'permit_empty|valid_date[Y-m-d H:i:s]',
+        'sender_account_id' => 'permit_empty|is_natural_no_zero',
+        'default_name'  => 'permit_empty|max_length[150]',
+        'status'        => 'required|in_list[DRAFT,READY,RUNNING,PAUSED,CANCELED,COMPLETED,FAILED]',
+        'batch_size'    => 'required|integer|greater_than[0]',
+        'completed_at'  => 'permit_empty|valid_date[Y-m-d H:i:s]',
     ];
 
-    protected $validationMessages = [];
+    protected $validationMessages = [
+        'name.required' => 'The campaign name is required.',
+        'name.max_length' => 'The campaign name must be less than 150 characters.',
+        'subject.required' => 'The campaign subject is required.',
+        'subject.max_length' => 'The campaign subject must be less than 255 characters.',
+        'sender_account_id.is_natural_no_zero' => 'The sender account must be a valid ID.',
+    ];
+
     protected $skipValidation     = false;
     protected $cleanValidationRules = true;
+
+    public function forUser(UserModel $user)
+    {
+        return $this->where('user_id', $user->id);
+    }
 }

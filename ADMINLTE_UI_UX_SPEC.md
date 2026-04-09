@@ -15,7 +15,6 @@
 
 ### Campaign Statuses
 - `Draft` → **secondary (gray)**
-- `Scheduled` → **info (blue)**
 - `Running` → **primary (indigo/blue)**
 - `Paused` → **warning (yellow/orange)**
 - `Completed` → **success (green)**
@@ -24,15 +23,8 @@
 
 ### Recipient Delivery Statuses
 - `Pending` → **secondary (gray)**
-- `Queued` → **info (blue)**
 - `Sent` → **success (green)**
-- `Delivered` → **primary (indigo/blue)**
-- `Opened` → **teal/cyan**
-- `Clicked` → **purple**
-- `Bounced` → **warning (yellow/orange)**
-- `Rejected` → **danger (red)**
-- `Unsubscribed` → **dark (charcoal)**
-- `Complained` → **danger (red, outlined variant)**
+- `Failed` → **danger (red, outlined variant)**
 
 > Keep labels identical in all tables, cards, filters, and logs.
 
@@ -108,7 +100,7 @@ Single-glance operational status + quick actions.
    - Active Sender Accounts
 2. **Campaign Status Distribution** (donut or stacked bar)
 3. **Recent Campaigns Table**
-   - Name, Owner, Sender, Scheduled/Started, Status badge, Quick actions
+   - Name, Owner, Sender, Started, Status badge, Quick actions
 4. **Delivery Trend Chart** (last 7/30 days)
 5. **Recent Errors/Alerts Panel**
 6. **Quick Actions**
@@ -167,12 +159,12 @@ Single-glance operational status + quick actions.
 ## 6) Campaign Pages
 
 ### 6.1 Campaign List
-- Columns: Campaign Name, Owner, Template, Sender, Target List, Scheduled At, Sent/Total, Status, Actions.
+- Columns: Campaign Name, Owner, Template, Sender, Target List, Started at, Sent/Total, Status, Actions.
 - Top actions: Create Campaign.
 - Filters: status, owner (admin), sender, date range.
 - Row actions:
   - View
-  - Edit (if Draft/Scheduled)
+  - Edit (if Draft)
   - Pause/Resume (if Running/Paused)
   - Cancel
   - Duplicate
@@ -182,7 +174,7 @@ Single-glance operational status + quick actions.
 **Step 2:** Select sender account
 **Step 3:** Select template
 **Step 4:** Select recipients/list
-**Step 5:** Schedule (now or datetime)
+**Step 5:** Start now (transition to RUNNING)
 **Step 6:** Review + confirm
 
 - Persistent summary sidebar on desktop.
@@ -453,7 +445,7 @@ app/
 
 ## UX Flow Summary (Fast Path)
 1. User lands on Dashboard and clicks **Create Campaign**.
-2. Completes wizard (sender → template → recipients → schedule).
+2. Completes wizard (sender → template → recipients → Started).
 3. Optional **Test Send** before final confirmation.
 4. Campaign starts; user monitors progress in Campaign Detail and Logs.
 5. Recipient status and failures are reviewed in Recipient Status + Logs.

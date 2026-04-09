@@ -8,7 +8,7 @@ A **modular monolith** built with CodeIgniter 4 (CI4), MySQL/MariaDB, and SMTP p
 ### 1.2 Runtime Components
 - **Web App (CI4 HTTP):** admin/user UI and APIs for campaign management.
 - **Background Worker (CI4 CLI command via cron):** sends campaign emails in batches every 1 minute.
-- **Database (MySQL/MariaDB):** transactional source of truth for users, campaigns, recipients, logs.
+- **Database (MySQL/MariaDB):** transactional source of truth for users, campaigns, recipients, and campaign_logs.
 - **SMTP Providers:** configured per sender account.
 
 ### 1.3 Core Modules
@@ -54,7 +54,7 @@ app/
       DashboardController.php
       SenderAccountsController.php
       CampaignsController.php
-      CampaignTemplatesController.php
+      CampaignTemplateController.php
       CampaignRecipientsController.php
       CampaignActionsController.php
       CampaignLogsController.php
@@ -96,7 +96,7 @@ app/
   Commands/
     RunCampaignDelivery.php
   Libraries/
-    TenantScope.php
+    UserScope.php
   Validation/
     CampaignRules.php
     SenderAccountRules.php
@@ -114,6 +114,7 @@ writable/
 Notes:
 - Keep business logic in `Services`, not controllers.
 - CLI command triggers delivery orchestration; reuse same services as HTTP actions.
+- CHECK constraints may not be enforced in some MySQL versions; application-level validation must enforce these rules.
 
 ---
 
@@ -245,7 +246,7 @@ These are scope-safe improvements; they do not change core features.
 ## 4) Role/Access Control Design
 
 ### 4.1 Roles
-- `admin`: full access to all tenants/users/data.
+- `admin`: admin: full access to all users/data.
 - `user`: access only own data.
 
 ### 4.2 Enforcement Layers
@@ -289,6 +290,7 @@ Implementation pattern:
    - Atomic update pattern:
      - acquire if `status='RUNNING'` and (`locked_at IS NULL` or lock expired)
      - set `locked_at=NOW(), locked_by=<hostname:pid>`
+     - Lock TTL: 5 minutes (configurable)
    - release lock after batch.
 
 ### 6.3 Expired Lock Recovery
@@ -304,7 +306,7 @@ Implementation pattern:
 - One failure does not stop campaign.
 
 ### 7.2 Retry Policy
-- Configurable `MAX_RETRY` (e.g., 3).
+- Configurable `MAX_RETRY` should be configurable (e.g., via .env or config file)
 - For temporary SMTP errors:
   - increment `retry_count`
   - set `next_retry_at` with exponential backoff (e.g., +1m, +5m, +15m)
@@ -323,7 +325,7 @@ Implementation pattern:
 
 ### 7.4 Campaign Completion Rule
 After batch, if no `PENDING` recipients remain, campaign becomes:
-- `COMPLETED` if any `SENT` or `FAILED` terminal records exist and no pending retries.
+- `COMPLETED` when all recipients are terminal (SENT or FAILED) and no retryable PENDING remain.
 - `FAILED` only for campaign-level unrecoverable setup/runtime issues (not per-recipient failures).
 
 ---
@@ -445,14 +447,14 @@ Return counts for UI/logging:
 - `app/Controllers/User/DashboardController.php`
 - `app/Controllers/User/SenderAccountsController.php`
 - `app/Controllers/User/CampaignsController.php`
-- `app/Controllers/User/CampaignTemplatesController.php`
+- `app/Controllers/User/CampaignTemplateController.php`
 - `app/Controllers/User/CampaignRecipientsController.php`
 - `app/Controllers/User/CampaignActionsController.php`
 - `app/Controllers/User/CampaignLogsController.php`
 - `app/Controllers/User/TestSendController.php`
 
 ### 10.9 Libraries/Validation
-- `app/Libraries/TenantScope.php`
+- `app/Libraries/UserScope.php`
 - `app/Validation/CampaignRules.php`
 - `app/Validation/SenderAccountRules.php`
 - `app/Validation/RecipientImportRules.php`

@@ -10,9 +10,13 @@ class CreateCampaignsTable extends Migration
     {
         $this->forge->addField([
             'id' => [
-                'type'           => 'BIGINT',
-                'unsigned'       => true,
+                'type' => 'INT',
+                'unsigned' => true,
                 'auto_increment' => true,
+            ],
+            'user_id' => [
+                'type'       => 'INT',
+                'unsigned'   => true,
             ],
             'name' => [
                 'type'       => 'VARCHAR',
@@ -25,10 +29,12 @@ class CreateCampaignsTable extends Migration
             'sender_name' => [
                 'type'       => 'VARCHAR',
                 'constraint' => 150,
+                'null'       => true,
             ],
             'sender_email' => [
                 'type'       => 'VARCHAR',
                 'constraint' => 255,
+                'null'       => true,
             ],
             'reply_to_email' => [
                 'type'       => 'VARCHAR',
@@ -44,13 +50,9 @@ class CreateCampaignsTable extends Migration
                 'null' => true,
             ],
             'status' => [
-                'type'       => 'VARCHAR',
-                'constraint' => 30,
-                'default'    => 'draft',
-            ],
-            'scheduled_at' => [
-                'type' => 'DATETIME',
-                'null' => true,
+                'type' => 'ENUM',
+                'constraint' => ['DRAFT', 'READY', 'RUNNING', 'PAUSED', 'CANCELED', 'COMPLETED', 'FAILED'],
+                'default' => 'DRAFT',
             ],
             'created_at' => [
                 'type' => 'DATETIME',
@@ -60,12 +62,17 @@ class CreateCampaignsTable extends Migration
                 'type' => 'DATETIME',
                 'null' => true,
             ],
+            'batch_size' => [
+                'type' => 'INT',
+                'default' => 100,
+            ],
         ]);
 
         $this->forge->addKey('id', true);
-        $this->forge->addUniqueKey('name', 'uq_campaigns_name');
+        $this->forge->addKey('user_id');
+        $this->forge->addUniqueKey(['user_id', 'name'], 'uq_campaigns_user_name');
+        $this->forge->addForeignKey('user_id','users','id','CASCADE','CASCADE');
         $this->forge->addKey('status', false, false, 'idx_campaigns_status');
-        $this->forge->addKey('scheduled_at', false, false, 'idx_campaigns_scheduled_at');
         $this->forge->createTable('campaigns', true);
     }
 
