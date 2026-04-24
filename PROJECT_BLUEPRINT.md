@@ -5,9 +5,9 @@ Sistem pengiriman email massal (Broadcasting) berbasis CodeIgniter 4 dengan foku
 ## 🛠 Tech Stack
 - **Framework:** CodeIgniter 4.5+
 - **Auth:** CodeIgniter Shield (Session & Magic Link)
-- **UI:** Tabler Dashboard (Bootstrap 5)
-- **Database:** MySQL / MariaDB
-- **Icons:** Tabler Icons
+- **UI:** Tabler Dashboard (Bootstrap 5) - Premium Aesthetics
+- **Database:** MySQL / MariaDB (Optimized with Turbo Indexes)
+- **Engine:** Adaptive Worker System (Hybrid Scheduler + Queue Processor)
 
 ---
 
@@ -15,56 +15,57 @@ Sistem pengiriman email massal (Broadcasting) berbasis CodeIgniter 4 dengan foku
 
 ### 1. Campaign Wizard (Manajemen Kampanye)
 Alur pembuatan email massal dalam 5 langkah yang intuitif.
-- [x] **Step 1: Info Dasar** - Nama kampanye & pemilihan akun pengirim (Bisnis/Individu).
-- [x] **Step 2: Penerima** - Support upload CSV/TXT & integrasi database per-Tag.
+- [x] **Step 1: Info Dasar** - Nama kampanye & pemilihan akun pengirim.
+- [x] **Step 2: Penerima** - **Unified Master Table** (CSV, DB Tags, Manual) dengan real-time validation & deduplication.
 - [x] **Step 3: Konten** - Integrasi Template & Preview real-time.
 - [x] **Step 4: Penjadwalan** - Opsi kirim sekarang atau jadwalkan di waktu mendatang.
-- [x] **Step 5: Review** - Ringkasan akhir sebelum peluncuran.
-- [x] **Sistem Edit Draft:** Support pengalihan status kembali ke DRAFT saat diedit untuk keamanan.
-- [x] **Cleanup:** Penghapusan kampanye otomatis membersihkan `email_queue` & `tracking_logs`.
+- [x] **Step 5: Review** - Ringkasan akhir & peluncuran kampanye.
+- [x] **Hardening:** Proteksi status DRAFT agar kampanye tidak jalan sebelum setup tuntas.
 
 ### 2. SMTP & Deliverability Management
 Fitur pengelolaan pengirim email untuk menghindari SPAM.
 - [x] **Multi-Account SMTP:** Mendukung banyak akun pengirim sekaligus.
 - [x] **Gmail Smart Detection:** Deteksi otomatis akun Gmail dengan panduan *App Password*.
-- [x] **Domain Reputation Guide:** Panduan teknis SPF, DKIM, dan DMARC terintegrasi di UI.
-- [x] **Warm-up Mode:** Batasan pengiriman harian & per-jam untuk menjaga reputasi IP/Domain.
+- [x] **Warm-up Mode:** Batasan pengiriman harian & per-jam (Throttling) untuk menjaga reputasi.
+- [x] **Bounce Handling:** Deteksi otomatis email mental (Hard Bounce) via IMAP & otomatis masuk Suppression List.
 
-### 3. Contact & Segmentation
-- [x] **Master Contact:** Database kontak pusat.
-- [x] **Tagging System:** Pengelompokan kontak berdasarkan segmen/tag.
-- [x] **Bulk Import:** Import ribuan kontak via CSV dengan pembersihan data otomatis.
+### 3. Analytics & Tracking
+- [x] **Open Tracking:** Melacak siapa yang membuka email via tracking pixel.
+- [x] **Click Tracking:** Melacak link mana yang diklik (Link Wrapping).
+- [x] **Unsubscribe System:** Link berhenti berlangganan otomatis & manual.
+- [x] **Suppression List:** Database pusat email yang tidak boleh dikirimi lagi (Bounced/Unsubscribed).
 
 ### 4. Email Automation (Sequences)
 - [x] **Trigger-Based:** Automation berjalan otomatis saat kontak mendapatkan Tag tertentu.
-- [x] **Sequence Steps:** Membuat rangkaian email (Series) dengan jeda waktu (delay) tertentu.
+- [x] **Sequence Steps:** Membuat rangkaian email (Series) dengan jeda waktu (delay) hari.
 
-### 5. Security & Monitoring (Audit Trail)
-- [x] **Activity Logs:** Mencatat setiap aksi krusial (Import, Hapus, Kirim, Login).
-- [x] **System Logs:** Viewer log teknis (file-based) untuk debugging Admin.
-- [x] **Rate Limiting (Throttler):** Melindungi rute-rute berat (Import/Process) dari penyalahgunaan.
+### 5. Database & Worker Engine (Performance)
+- [x] **Adaptive Worker:** Satu proses background (`email:worker`) yang menangani Scheduler & Antrean sekaligus.
+- [x] **Turbo Indexes:** Optimasi database pada tabel `campaigns`, `email_queue`, `activity_logs`, dan `recipient_tags`.
+- [x] **Atomic Locking:** Menjamin tidak ada double-send saat menggunakan banyak worker sekaligus.
 
 ---
 
 ## 🏗 Struktur Database Penting
-- `campaigns`: Data utama kampanye dan statusnya.
-- `email_queue`: Antrean email yang menunggu dikirim oleh Cron.
-- `activity_logs`: Catatan audit aktivitas pengguna.
-- `automation_steps`: Langkah-langkah dalam alur email otomatis.
-- `smtp_accounts`: Kredensial server SMTP pengirim.
+- `campaigns`: Data utama kampanye dan statusnya (Indexed for performance).
+- `email_queue`: Antrean email dengan log riwayat pengiriman (Indexed).
+- `contacts` & `recipient_tags`: Database kontak dan segmentasi tag.
+- `tracking_logs`: Catatan setiap event Open/Click.
+- `suppression_list`: Daftar hitam email (Bounce/Unsubscribe).
+- `activity_logs`: Catatan audit aktivitas pengguna (Indexed).
 
 ---
 
 ## 📅 Rencana Pengembangan (Roadmap)
-- [ ] **Email Tracking:** Statistik Open Rate & Click-Through Rate (CTR).
-- [ ] **Unsubscribe Link:** Sistem otomatis untuk menangani permintaan berhenti berlangganan.
 - [ ] **A/B Testing:** Menguji dua subjek email berbeda dalam satu kampanye.
-- [ ] **Bounce Handling:** Otomatis menonaktifkan email yang mental (Hard Bounce).
+- [ ] **Email Builder (Drag & Drop):** Editor visual untuk membuat template email.
+- [ ] **Advanced Analytics:** Heatmap klik dan statistik geolokasi penerima.
 
 ---
 
 ## 🛡 Checklist Produksi
-1. [ ] Ubah `CI_ENVIRONMENT` ke `production` di file `.env`.
-2. [ ] Setel Cron Job untuk menjalankan `php spark email:run` setiap menit.
-3. [ ] Aktifkan HTTPS (`app.forceGlobalSecureRequests = true`).
-4. [ ] Konfigurasi SMTP Sistem di `.env` (untuk Magic Link & Reset Password).
+1. [x] Pasang **Turbo Indexes** (`php spark migrate`).
+2. [ ] Ubah `CI_ENVIRONMENT` ke `production` di file `.env`.
+3. [ ] Jalankan Worker Daemon: `php spark email:worker` (Gunakan Supervisor/Systemd).
+4. [ ] Aktifkan HTTPS (`app.forceGlobalSecureRequests = true`).
+5. [ ] Konfigurasi SMTP Sistem di `.env` (untuk Magic Link & Reset Password).

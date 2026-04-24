@@ -12,6 +12,7 @@ class EmailWorker extends BaseCommand
     protected $description = 'Worker pengirim email real-time dengan proteksi rate limit.';
 
     private $encrypter;
+    private $lastSchedulerCheck = 0; // Untuk tracking waktu terakhir cek jadwal
 
     public function run(array $params)
     {
@@ -33,6 +34,13 @@ class EmailWorker extends BaseCommand
                 WHERE status = 'PROCESSING'
                 AND updated_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)
             ");
+
+            // 🔥 INTEGRASI SCHEDULER: Aktifkan kampanye yang sudah masuk jadwal
+            // Kita batasi pengecekan ini setiap 20 detik sekali agar tidak membebani DB
+            if (time() - $this->lastSchedulerCheck >= 20) {
+                $this->activateScheduledCampaigns($db);
+                $this->lastSchedulerCheck = time();
+            }
 
             // --- PROSES OTOMASI (SEQUENCES) ---
             $this->processAutomations($db);
@@ -414,6 +422,31 @@ class EmailWorker extends BaseCommand
                 log_message('error', '[Automation] Error processing item ID ' . $item['id'] . ': ' . $e->getMessage());
                 $db->table('automation_queue')->where('id', $item['id'])->update(['status' => 'PENDING']);
             }
+        }
+    }
+
+    /**
+     * 🔥 LOGIKA SCHEDULER (Si Satpam)
+     * Mengubah kampanye SCHEDULED menjadi RUNNING jika sudah masuk waktunya.
+     */
+    private function activateScheduledCampaigns($db)
+    {
+        $now = date('Y-m-d H:i:s');
+
+        // Cari kampanye SCHEDULED yang sudah waktunya dikirim (maks 5 per eksekusi agar tidak berat)
+        // Berkat index idx_status_schedule, query ini sangat cepat.
+        $campaigns = $db->table('campaigns')
+                        ->where('status', 'SCHEDULED')
+                        ->where('scheduled_at <=', $now)
+                        ->limit(5)
+                        ->get()->getResult();
+
+        foreach ($campaigns as $campaign) {
+            $db->table('campaigns')
+               ->where('id', $campaign->id)
+               ->update(['status' => 'RUNNING', 'updated_at' => $now]);
+
+            CLI::write("SCHEDULER: Kampanye [{$campaign->name}] telah DIAKTIFKAN!", 'green');
         }
     }
 }
