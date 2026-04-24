@@ -34,12 +34,12 @@ class ContactController extends BaseController
         $model = new ContactModel();
         $db = \Config\Database::connect();
 
-        $email = $this->request->getPost('email');
-        $name  = $this->request->getPost('name');
+        $email = strtolower(trim($this->request->getPost('email') ?? ''));
+        $name  = trim($this->request->getPost('name') ?? '');
         $tagId = $this->request->getPost('tag_id');
 
-        if (empty($email)) {
-            return redirect()->back()->with('error', 'Email wajib diisi.');
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return redirect()->back()->with('error', 'Format email tidak valid atau kosong.');
         }
 
         $data = [
@@ -116,8 +116,10 @@ class ContactController extends BaseController
             while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
                 if (empty($data[0])) continue;
 
-                $email = $data[0];
-                $name  = $data[1] ?? '';
+                $email = strtolower(trim($data[0]));
+                $name  = trim($data[1] ?? '');
+
+                if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) continue;
 
                 // Insert ignore logic
                 try {
@@ -166,9 +168,13 @@ class ContactController extends BaseController
         $contact = $model->where(['id' => $id, 'user_id' => auth()->id()])->first();
         if (!$contact) return redirect()->back()->with('error', 'Kontak tidak ditemukan.');
 
-        $email = $this->request->getPost('email');
-        $name  = $this->request->getPost('name');
+        $email = strtolower(trim($this->request->getPost('email') ?? ''));
+        $name  = trim($this->request->getPost('name') ?? '');
         $tagId = $this->request->getPost('tag_id');
+
+        if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            return redirect()->back()->with('error', 'Format email tidak valid.');
+        }
 
         $model->update($id, ['email' => $email, 'name' => $name]);
 

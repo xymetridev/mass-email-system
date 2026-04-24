@@ -80,6 +80,7 @@ $routes->group('campaigns', ['filter' => 'auth'], static function ($routes) {
     $routes->post('wizard/process/(:num)', 'CampaignWizardController::process/$1', ['as' => 'app.campaigns.wizard.process']);
     $routes->post('wizard/finish', 'CampaignWizardController::finish', ['as' => 'app.campaigns.wizard.finish']);
     $routes->get('wizard/cancel', 'CampaignWizardController::cancel', ['as' => 'app.campaigns.wizard.cancel']);
+    $routes->get('wizard/tag-contacts/(:num)', 'CampaignWizardController::getTagContacts/$1');
     
     // 3. Aksi Operasional (POST karena mengubah data)
     $routes->get('campaigns/show/(:num)', 'CampaignController::show/$1', ['as' => 'app.campaigns.show']);

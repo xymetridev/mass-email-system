@@ -6,13 +6,18 @@
         <h2 class="page-title">Setup Kampanye</h2>
     </div>
     <div>
-        <a href="<?= url_to('app.campaigns.wizard.cancel') ?>" class="btn btn-outline-danger btn-sm shadow-sm" onclick="return confirm('Yakin ingin membatalkan edit dan kembali ke dashboard?')">
+        <button type="button" class="btn btn-outline-danger btn-sm shadow-sm" 
+                onclick="confirmAction({
+                    title: 'Batalkan Edit?',
+                    text: 'Perubahan yang belum disimpan akan hilang. Kembali ke dashboard?',
+                    onConfirm: () => window.location.href = '<?= url_to('app.campaigns.wizard.cancel') ?>'
+                })">
             <i class="ti ti-x me-1"></i> Batal & Keluar
-        </a>
+        </button>
     </div>
 </div>
 <div class="container-xl">
-    <div class="steps steps-blue steps-counter mb-4"  style="border-left: none !important;">
+    <div class="steps steps-blue steps-counter mb-4" style="border-left: none !important;">
         <a href="<?= url_to('app.campaigns.wizard', 1) ?>" class="step-item">Info Dasar</a>
         <span class="step-item active">Penerima</span>
         <span class="step-item">Konten</span>
@@ -20,117 +25,79 @@
         <span class="step-item">Review</span>
     </div>
 
-    <div class="card shadow-sm border-0">
+    <div class="card shadow-sm border-0 mb-4">
         <div class="card-header">
-            <ul class="nav nav-tabs card-header-tabs" data-bs-toggle="tabs">
+            <h3 class="card-title">1. Pilih Sumber Kontak</h3>
+        </div>
+        <div class="card-header border-bottom-0 p-0">
+            <ul class="nav nav-tabs card-header-tabs m-0" data-bs-toggle="tabs" id="sourceTabs">
                 <li class="nav-item">
-                    <a href="#tabs-upload" class="nav-link <?= ($wizard['source_mode'] ?? 'upload') == 'upload' ? 'active' : '' ?>" data-bs-toggle="tab">
-                        <i class="ti ti-upload me-2"></i> Upload File Baru
+                    <a href="#tabs-upload" class="nav-link <?= ($wizard['source_mode'] ?? 'upload') == 'upload' ? 'active' : '' ?>" data-bs-toggle="tab" onclick="document.getElementById('source_mode').value='upload'">
+                        <i class="ti ti-upload me-2"></i> Upload CSV
                     </a>
                 </li>
                 <li class="nav-item">
-                    <a href="#tabs-database" class="nav-link <?= ($wizard['source_mode'] ?? '') == 'database' ? 'active' : '' ?>" data-bs-toggle="tab">
-                        <i class="ti ti-database me-2"></i> Pilih dari Kontak & Segmen
+                    <a href="#tabs-database" class="nav-link <?= ($wizard['source_mode'] ?? '') == 'database' ? 'active' : '' ?>" data-bs-toggle="tab" onclick="document.getElementById('source_mode').value='database'">
+                        <i class="ti ti-database me-2"></i> Kontak & Segmen
+                    </a>
+                </li>
+                <li class="nav-item">
+                    <a href="#tabs-manual" class="nav-link <?= ($wizard['source_mode'] ?? '') == 'manual' ? 'active' : '' ?>" data-bs-toggle="tab" onclick="document.getElementById('source_mode').value='manual'">
+                        <i class="ti ti-pencil-plus me-2"></i> Input Manual
                     </a>
                 </li>
             </ul>
         </div>
         <div class="card-body py-4">
             <div class="tab-content">
-                <!-- Tab Upload -->
+
+                <!-- ============ TAB UPLOAD CSV ============ -->
                 <div class="tab-pane fade <?= ($wizard['source_mode'] ?? 'upload') == 'upload' ? 'show active' : '' ?>" id="tabs-upload">
-                    <div class="text-center mb-4">
-                        <h3 class="mb-3">Langkah 2: Siapa penerimanya?</h3>
-                        <p class="text-muted">Upload file CSV atau TXT yang berisi daftar email target Anda.</p>
-                        
-                        <div class="mb-3 d-flex gap-2 align-items-center justify-content-center" style="max-width: 600px; margin: 0 auto;">
-                            <div class="flex-grow-1 text-start">
-                                <input type="file" id="contactFile" class="form-control" accept=".csv,.txt">
-                            </div>
-                            <div class="dropdown">
-                                <button class="btn btn-outline-secondary dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                    <i class="ti ti-download me-2"></i> Template Target
-                                </button>
-                                <ul class="dropdown-menu dropdown-menu-end">
-                                    <li>
-                                        <a class="dropdown-item" href="<?= url_to('user.contacts.sample') ?>">
-                                            <i class="ti ti-file-spreadsheet me-2 text-success"></i> Download format .CSV
-                                        </a>
-                                    </li>
-                                </ul>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div id="previewArea" style="display:none" class="mt-4 text-start">
-                        <div class="d-flex justify-content-between align-items-center mb-2">
-                            <div class="hr-text m-0">Pratinjau & Edit Data</div>
-                            <span class="badge bg-azure-lt" id="rowCountBadge">0 Kontak</span>
-                        </div>
-
-                        <div class="card-table-container border rounded mb-3" style="max-height: 400px; overflow: auto;">
-                            <table class="table table-vcenter card-table table-nowrap" id="previewTable" style="min-width: 800px;">
-                                <thead class="sticky-top bg-light">
-                                    <tr id="tableHeader"></tr>
-                                </thead>
-                                <tbody id="tableBody"></tbody>
-                            </table>
-                        </div>
-
-                        <!-- Opsi Simpan ke Master -->
-                        <div class="card bg-blue-lt border-0 shadow-none mb-3">
-                            <div class="card-body">
-                                <label class="form-check form-switch mb-2">
-                                    <input class="form-check-input" type="checkbox" name="save_to_master" id="saveToMaster" value="1">
-                                    <span class="form-check-label font-weight-bold">Simpan ke Daftar Kontak Master?</span>
-                                </label>
-                                <div id="tagSelectArea" style="display:none">
-                                    <label class="form-label small">Pilih Tag untuk Kontak Baru Ini (Opsional):</label>
-                                    <select name="tag_id" class="form-select form-select-sm">
-                                        <option value="">-- Tanpa Tag --</option>
-                                        <?php foreach($tags as $t): ?>
-                                            <option value="<?= $t['id'] ?>"><?= esc($t['name']) ?></option>
-                                        <?php endforeach; ?>
-                                    </select>
-                                </div>
-                            </div>
+                    <div class="text-center">
+                        <h4 class="mb-2">Tambahkan dari File</h4>
+                        <p class="text-muted small mb-3">Upload file CSV/TXT. Data akan otomatis digabungkan ke Daftar Penerima.</p>
+                        <div class="d-flex gap-2 justify-content-center align-items-center" style="max-width: 500px; margin: 0 auto;">
+                            <input type="file" id="contactFile" class="form-control" accept=".csv,.txt">
+                            <a href="<?= url_to('user.contacts.sample') ?>" class="btn btn-outline-secondary" title="Download Template">
+                                <i class="ti ti-download"></i>
+                            </a>
                         </div>
                     </div>
                 </div>
 
-                <!-- Tab Database -->
+                <!-- ============ TAB DATABASE ============ -->
                 <div class="tab-pane fade <?= ($wizard['source_mode'] ?? '') == 'database' ? 'show active' : '' ?>" id="tabs-database">
                     <div class="text-center py-4">
-                        <h3>Pilih Segmentasi (Tag)</h3>
+                        <h3 class="mb-1">Pilih Segmentasi (Tag)</h3>
                         <p class="text-muted">Kirim email ke kontak yang sudah ada di database berdasarkan Tag.</p>
                         
                         <div class="row justify-content-center">
                             <div class="col-md-6 text-start">
                                 <label class="form-label">Pilih Satu atau Lebih Tag:</label>
                                 <div class="form-selectgroup form-selectgroup-boxes d-flex flex-column">
-                                    <?php 
-                                        $savedTags = explode(',', $wizard['db_tags'] ?? '');
-                                    ?>
+                                    <?php $savedTags = explode(',', $wizard['db_tags'] ?? ''); ?>
                                     <?php foreach($tags as $t): ?>
                                     <label class="form-selectgroup-item flex-fill">
                                         <input type="checkbox" name="selected_tags[]" value="<?= $t['id'] ?>" 
-                                               class="form-selectgroup-input tag-checkbox" 
+                                               class="form-selectgroup-input tag-checkbox"
+                                               data-name="<?= esc($t['name']) ?>"
                                                <?= in_array($t['id'], $savedTags) ? 'checked' : '' ?>
-                                               onchange="toggleDatabaseMode()">
+                                               onchange="handleTagChange(this)">
                                         <div class="form-selectgroup-label d-flex align-items-center p-3">
                                             <div class="me-3">
                                                 <span class="form-selectgroup-check"></span>
                                             </div>
                                             <div>
                                                 <div class="font-weight-bold"><?= esc($t['name']) ?></div>
-                                                <div class="text-muted small">Kirim ke semua kontak dengan tag ini.</div>
+                                                <div class="text-muted small">Klik untuk menarik semua kontak dengan tag ini ke daftar.</div>
                                             </div>
                                         </div>
                                     </label>
                                     <?php endforeach; ?>
                                 </div>
+
                                 <?php if(empty($tags)): ?>
-                                    <div class="alert alert-warning text-center">
+                                    <div class="alert alert-warning text-center mt-3">
                                         Belum ada Tag di database. Silakan buat di menu <a href="<?= url_to('user.contacts') ?>">Kontak & Segmen</a>.
                                     </div>
                                 <?php endif; ?>
@@ -138,286 +105,458 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- ============ TAB MANUAL INPUT ============ -->
+                <div class="tab-pane fade <?= ($wizard['source_mode'] ?? '') == 'manual' ? 'show active' : '' ?>" id="tabs-manual">
+                    <div class="text-center">
+                        <h4 class="mb-2">Tambahkan Manual</h4>
+                        <div class="row justify-content-center">
+                            <div class="col-md-8">
+                                <div class="input-group mb-2">
+                                    <input type="text" id="manualEmailInput" class="form-control" placeholder="nama@domain.com">
+                                    <input type="text" id="manualNameInput" class="form-control" placeholder="Nama (opsional)">
+                                    <button class="btn btn-primary" type="button" onclick="addManualEmail()">
+                                        <i class="ti ti-plus me-1"></i> Tambah
+                                    </button>
+                                </div>
+                                <div id="manualEmailError" class="text-danger small text-start" style="display:none"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div><!-- end tab-content -->
+        </div>
+    </div>
+
+    <!-- ============ DAFTAR PENERIMA (MASTER TABLE) ============ -->
+    <div class="card shadow-sm border-0">
+        <div class="card-header d-flex justify-content-between align-items-center">
+            <h3 class="card-title">2. Daftar Penerima Gabungan</h3>
+            <div class="d-flex gap-2">
+                <span class="badge bg-azure-lt px-2 py-1 fs-5" id="totalBadge">0 Total</span>
+                <span class="badge bg-success-lt px-2 py-1 fs-5" id="validBadge" style="display:none;">0 Valid</span>
+                <span class="badge bg-danger-lt px-2 py-1 fs-5" id="invalidBadge" style="display:none;">0 Invalid</span>
             </div>
         </div>
         
-        <form action="<?= url_to('app.campaigns.wizard.process', 2) ?>" method="POST" id="formStep2">
-            <?= csrf_field() ?>
-            <input type="hidden" name="contacts_json" id="contacts_json" value="<?= esc($wizard['contacts_json'] ?? '', 'attr') ?>">
-            <input type="hidden" name="source_mode" id="source_mode" value="upload">
-            <input type="hidden" name="db_tags" id="db_tags" value="">
-            
-            <!-- Elemen ini dipindah agar masuk form -->
-            <div style="display:none">
-                <input type="checkbox" name="save_to_master_form" id="saveToMasterForm" value="1">
-                <input type="hidden" name="tag_id_form" id="tagIdForm" value="">
+        <div class="card-body p-0">
+            <div id="emptyState" class="text-center py-5 text-muted">
+                <i class="ti ti-users fs-1 d-block mb-2 text-gray-300"></i>
+                Belum ada kontak yang ditambahkan.<br>
+                Silakan gunakan salah satu sumber di atas.
             </div>
 
-            <div class="card-footer d-flex justify-content-between">
-                <a href="<?= url_to('app.campaigns.wizard', 1) ?>" class="btn btn-link">Kembali</a>
-                <div>
-                    <?php if (($wizard['max_step'] ?? 1) >= 5): ?>
-                        <button type="submit" name="jump_to_review" value="yes" class="btn btn-success me-2">
-                            Simpan & Kembali ke Review <i class="ti ti-check ms-1"></i>
-                        </button>
-                    <?php endif; ?>
-                    
-                    <button type="submit" class="btn btn-primary" id="btnNext" disabled>
-                        Lanjut ke Konten <i class="ti ti-arrow-right ms-1"></i>
-                    </button>
-                </div>
+            <div id="tableContainer" class="table-responsive" style="display:none; max-height: 400px; overflow-y: auto;">
+                <table class="table table-vcenter table-hover table-nowrap mb-0" id="previewTable">
+                    <thead class="sticky-top bg-white shadow-sm">
+                        <tr>
+                            <th class="w-1 text-center">#</th>
+                            <th>Alamat Email</th>
+                            <th>Nama Lengkap</th>
+                            <th>Sumber Data</th>
+                            <th class="w-1 text-center">Aksi</th>
+                        </tr>
+                    </thead>
+                    <tbody id="tableBody">
+                        <!-- Render via JS -->
+                    </tbody>
+                </table>
             </div>
-        </form>
-    </div>
+        </div>
+
+        <div class="card-footer" id="masterSaveArea" style="display:none;">
+            <label class="form-check form-switch mb-2">
+                <input class="form-check-input" type="checkbox" id="saveToMasterToggle" onchange="toggleSaveMaster(this.checked)">
+                <span class="form-check-label font-weight-bold text-primary">Simpan kontak-kontak baru ini ke Database Master?</span>
+            </label>
+            <div id="saveMasterTagArea" class="ms-5" style="display:none;">
+                <label class="form-label small text-muted mb-1">Pilih Tag untuk kontak baru ini (Opsional):</label>
+                <select class="form-select form-select-sm w-auto" onchange="document.getElementById('tagIdForm').value = this.value">
+                    <option value="">-- Tanpa Tag --</option>
+                    <?php foreach($tags as $t): ?>
+                        <option value="<?= $t['id'] ?>"><?= esc($t['name']) ?></option>
+                    <?php endforeach; ?>
+                </select>
+                <p class="text-muted small mt-1 mb-0">Sistem akan membuang duplikat otomatis. Kontak yang sudah ada tidak akan digandakan.</p>
+            </div>
+        </div>
+
+    <!-- FORM SUBMIT -->
+    <form action="<?= url_to('app.campaigns.wizard.process', 2) ?>" method="POST" id="formStep2" class="mt-4">
+        <?= csrf_field() ?>
+        <!-- Nilai Final JSON -->
+        <input type="hidden" name="contacts_json" id="contacts_json" value="<?= esc($wizard['contacts_json'] ?? '', 'attr') ?>">
+        
+        <!-- Untuk State Restoration -->
+        <input type="hidden" name="source_mode" id="source_mode" value="<?= $wizard['source_mode'] ?? 'upload' ?>">
+        <input type="hidden" name="db_tags" id="db_tags" value="<?= $wizard['db_tags'] ?? '' ?>">
+        
+        <input type="hidden" name="save_to_master_form" id="saveToMasterForm" value="0">
+        <input type="hidden" name="tag_id_form" id="tagIdForm" value="">
+
+        <div class="d-flex justify-content-between align-items-center">
+            <a href="<?= url_to('app.campaigns.wizard', 1) ?>" class="btn btn-link text-muted">
+                <i class="ti ti-arrow-left me-1"></i> Kembali ke Info Dasar
+            </a>
+            <div>
+                <?php if (($wizard['max_step'] ?? 1) >= 5): ?>
+                    <button type="button" class="btn btn-success me-2" onclick="submitStep2(true)" id="btnSaveReview" disabled>
+                        Simpan & Ke Review <i class="ti ti-check ms-1"></i>
+                    </button>
+                <?php endif; ?>
+                <button type="button" class="btn btn-primary" id="btnNext" onclick="submitStep2(false)" disabled>
+                    Lanjut ke Konten Email <i class="ti ti-arrow-right ms-1"></i>
+                </button>
+            </div>
+        </div>
+    </form>
 </div>
 
-<script>
-    // JS Logic tambahan untuk sinkronisasi form
-    document.getElementById('saveToMaster')?.addEventListener('change', function(e) {
-        document.getElementById('saveToMasterForm').checked = e.target.checked;
-        document.getElementById('tagSelectArea').style.display = e.target.checked ? 'block' : 'none';
-    });
-
-    document.querySelector('select[name="tag_id"]')?.addEventListener('change', function(e) {
-        document.getElementById('tagIdForm').value = e.target.value;
-    });
-
-    function toggleDatabaseMode() {
-        const checked = document.querySelectorAll('.tag-checkbox:checked');
-        const nextBtn = document.getElementById('btnNext');
-        const modeInput = document.getElementById('source_mode');
-        const tagsInput = document.getElementById('db_tags');
-
-        if (checked.length > 0) {
-            nextBtn.disabled = false;
-            modeInput.value = 'database';
-            
-            let selectedIds = [];
-            checked.forEach(c => selectedIds.push(c.value));
-            tagsInput.value = selectedIds.join(',');
-        } else if(globalData.length === 0) {
-            nextBtn.disabled = true;
-            modeInput.value = 'upload';
-        }
-    }
-</script>
-
 <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-
 <script>
+/* =====================================================
+   GLOBAL STATE & DATA STRUCTURE
+   Data: { email: string, name: string, source: string }
+   ===================================================== */
+let globalData = []; 
 
-    function downloadTemplate(format) {
-        // Isi template data dummy
-        const header = "email,nama,perusahaan,kota\n";
-        const row1 = "budi.santoso@example.com,Budi Santoso,PT Maju Mundur,Jakarta\n";
-        const row2 = "siti.aminah@example.com,Siti Aminah,CV Berkah,Bandung\n";
-        const row3 = "joko.anwar@example.com,Joko Anwar,Toko Kelontong,Surabaya\n";
-        
-        const content = header + row1 + row2 + row3;
+function isValidEmail(email) {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim().toLowerCase());
+}
 
-        // Buat objek Blob (file virtual di browser)
-        const blob = new Blob([content], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
-        
-        // Buat elemen link tersembunyi untuk memicu download
-        const link = document.createElement("a");
-        link.setAttribute("href", url);
-        link.setAttribute("download", "template_kontak_kampanye." + format);
-        link.style.visibility = 'hidden';
-        
-        // Eksekusi download lalu hapus linknya
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-    }
+function normalizeEmail(email) {
+    return email.trim().toLowerCase();
+}
 
-
-    let globalData = []; 
-    let columnMapping = []; // Menyimpan pilihan user: ['email', 'name', 'custom', 'none']
-
-    document.addEventListener('DOMContentLoaded', function() {
-        const rawData = document.getElementById('contacts_json').value;
-        if (rawData && rawData !== "") {
-            try {
-                const data = JSON.parse(rawData);
-                // Kembalikan data dan mapping dari JSON ke variabel global
-                if (data.rows && data.mapping) {
-                    globalData = data.rows;
-                    columnMapping = data.mapping;
+document.addEventListener('DOMContentLoaded', function () {
+    // 1. Restore Data from Hidden Input (if user pressed 'Back' from Step 3)
+    const rawData = document.getElementById('contacts_json').value;
+    if (rawData && rawData !== '') {
+        try {
+            const data = JSON.parse(rawData);
+            if (data.rows && data.mapping) {
+                const emailIdx = data.mapping.indexOf('email');
+                const nameIdx  = data.mapping.indexOf('name');
+                if (emailIdx !== -1) {
+                    globalData = data.rows.map(r => ({
+                        email: r[emailIdx],
+                        name: nameIdx !== -1 ? r[nameIdx] : '',
+                        source: 'Tersimpan (Draft)'
+                    }));
                 }
-                // Panggil renderTable (Bukan renderPreviewTable)
-                renderTable(); 
-            } catch (e) { 
-                console.error("Data kontak gagal di-parse", e); 
             }
-        }
+        } catch (e) { console.error('Gagal parse json', e); }
+    }
+
+    // 2. Restore Tags if any were checked (Trigger AJAX to ensure freshness, or skip if we trust the JSON)
+    // Actually, if we restored from JSON, the tag data is already in globalData as "Tersimpan".
+    // We don't need to auto-fetch on load unless we want to refresh. Let's just render what we have.
+    renderTable();
+});
+
+/* =====================================================
+   ADD TO GLOBAL DATA WITH DEDUPLICATION
+   ===================================================== */
+function addContacts(contactsArray) {
+    let added = 0;
+    let duplicate = 0;
+
+    contactsArray.forEach(newC => {
+        const normEmail = normalizeEmail(newC.email);
+        if (!normEmail) return;
+
+        // Cek duplikat di globalData
+        const exists = globalData.some(existing => normalizeEmail(existing.email) === normEmail);
         
-        // Jalankan sinkronisasi mode database saat load
-        toggleDatabaseMode();
+        if (!exists) {
+            globalData.unshift({
+                email: normEmail,
+                name: newC.name.trim(),
+                source: newC.source
+            });
+            added++;
+        } else {
+            duplicate++;
+        }
     });
 
-    document.getElementById('contactFile').addEventListener('change', function(e) {
-        const file = e.target.files[0];
-        if (file) {
-            Papa.parse(file, {
-                header: false, // Tetap false agar kita bisa kontrol manual array-nya
-                skipEmptyLines: true,
-                complete: function(results) {
-                    let parsedData = results.data;
+    renderTable();
+    return { added, duplicate };
+}
 
-                    if (parsedData.length > 0) {
-                        // 1. Set default mapping (Kolom 1=email, Kolom 2=name)
-                        columnMapping = parsedData[0].map((_, i) => i === 0 ? 'email' : (i === 1 ? 'name' : 'custom'));
-                        
-                        // 2. AUTO-DETECT HEADER
-                        // Cek teks di baris pertama, kolom pertama
-                        const firstCell = String(parsedData[0][0]).toLowerCase();
-                        
-                        // Jika tidak ada tanda '@', atau tulisannya persis 'email', kita anggap itu Header
-                        if (!firstCell.includes('@') || firstCell === 'email') {
-                            parsedData.shift(); // .shift() berfungsi menghapus baris pertama dari array
-                        }
+/* =====================================================
+   RENDER TABLE
+   ===================================================== */
+function renderTable() {
+    const tbody = document.getElementById('tableBody');
+    tbody.innerHTML = '';
 
-                        // 3. Masukkan sisa datanya ke tabel
-                        globalData = parsedData;
-                        renderTable();
-                    }
+    const emptyState = document.getElementById('emptyState');
+    const tableCont  = document.getElementById('tableContainer');
+    const btnNext    = document.getElementById('btnNext');
+    const btnSaveRev = document.getElementById('btnSaveReview');
+    const saveArea   = document.getElementById('masterSaveArea');
+
+    if (globalData.length === 0) {
+        emptyState.style.display = 'block';
+        tableCont.style.display = 'none';
+        saveArea.style.display = 'none';
+        btnNext.disabled = true;
+        if(btnSaveRev) btnSaveRev.disabled = true;
+        updateBadges(0, 0, 0);
+        updateHiddenJson();
+        return;
+    }
+
+    emptyState.style.display = 'none';
+    tableCont.style.display = 'block';
+    saveArea.style.display = 'block';
+
+    let validCount = 0;
+    let invalidCount = 0;
+
+    globalData.forEach((row, index) => {
+        const isInvalid = !isValidEmail(row.email);
+        if (isInvalid) invalidCount++; else validCount++;
+
+        const trClass = isInvalid ? 'table-danger' : '';
+        const sourceBadgeClass = getSourceBadgeClass(row.source);
+
+        const tr = document.createElement('tr');
+        tr.className = trClass;
+        tr.innerHTML = `
+            <td class="text-center text-muted small">${index + 1}</td>
+            <td class="fw-medium">
+                ${isInvalid ? '<i class="ti ti-alert-triangle text-danger me-1" title="Format tidak valid"></i>' : ''}
+                <span contenteditable="true" onblur="updateCell(${index}, 'email', this.innerText)">${row.email}</span>
+            </td>
+            <td>
+                <span contenteditable="true" onblur="updateCell(${index}, 'name', this.innerText)" class="text-muted">${row.name || '-'}</span>
+            </td>
+            <td><span class="badge ${sourceBadgeClass}">${row.source}</span></td>
+            <td class="text-center">
+                <button type="button" class="btn btn-icon btn-ghost-danger btn-sm" onclick="removeRow(${index})">
+                    <i class="ti ti-x"></i>
+                </button>
+            </td>
+        `;
+        tbody.appendChild(tr);
+    });
+
+    updateBadges(globalData.length, validCount, invalidCount);
+    
+    // Disable next if absolutely 0 valid emails
+    const canProceed = validCount > 0;
+    btnNext.disabled = !canProceed;
+    if(btnSaveRev) btnSaveRev.disabled = !canProceed;
+
+    updateHiddenJson();
+}
+
+function getSourceBadgeClass(source) {
+    if (source === 'Upload CSV') return 'bg-purple-lt';
+    if (source === 'Input Manual') return 'bg-orange-lt';
+    if (source === 'Tersimpan (Draft)') return 'bg-secondary-lt';
+    return 'bg-blue-lt'; // Untuk Tag Database
+}
+
+function updateCell(index, key, newValue) {
+    if (key === 'email') newValue = normalizeEmail(newValue);
+    globalData[index][key] = newValue;
+    renderTable(); // Re-render to update validation colors
+}
+
+function removeRow(index) {
+    globalData.splice(index, 1);
+    renderTable();
+}
+
+function updateBadges(total, valid, invalid) {
+    document.getElementById('totalBadge').innerText = total + ' Total';
+    
+    const vb = document.getElementById('validBadge');
+    vb.innerText = valid + ' Valid';
+    vb.style.display = valid > 0 ? 'inline-block' : 'none';
+
+    const ib = document.getElementById('invalidBadge');
+    ib.innerText = invalid + ' Invalid';
+    ib.style.display = invalid > 0 ? 'inline-block' : 'none';
+}
+
+function updateHiddenJson() {
+    // Konversi globalData ke format struktur API (mapping & rows)
+    const validRows = globalData
+        .filter(r => isValidEmail(r.email))
+        .map(r => [r.email, r.name]);
+
+    document.getElementById('contacts_json').value = JSON.stringify({
+        mapping: ['email', 'name'],
+        rows: validRows
+    });
+}
+
+
+/* =====================================================
+   TAB 1: UPLOAD CSV LOGIC
+   ===================================================== */
+document.getElementById('contactFile').addEventListener('change', function (e) {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    Papa.parse(file, {
+        header: false,
+        skipEmptyLines: true,
+        complete: function (results) {
+            let data = results.data;
+            if (data.length === 0) return;
+
+            // Auto-detect header
+            const firstCell = String(data[0][0]).toLowerCase().trim();
+            if (!firstCell.includes('@') || firstCell === 'email') {
+                data.shift();
+            }
+
+            const newContacts = data.map(row => ({
+                email: row[0] || '',
+                name: row[1] || '',
+                source: 'Upload CSV'
+            }));
+
+            // Hapus data upload sebelumnya agar tidak double jika user upload 2x file yg beda
+            globalData = globalData.filter(r => r.source !== 'Upload CSV');
+            
+            const stats = addContacts(newContacts);
+            showAlert('File Diproses', `${stats.added} kontak berhasil ditambahkan. ${stats.duplicate} duplikat diabaikan.`, 'success');
+            
+            // Reset input file
+            e.target.value = ''; 
+        }
+    });
+});
+
+
+/* =====================================================
+   TAB 2: DATABASE TAG LOGIC (AJAX)
+   ===================================================== */
+function handleTagChange(checkbox) {
+    const tagId = checkbox.value;
+    const tagName = checkbox.getAttribute('data-name');
+    const sourceName = `Segmen: ${tagName}`;
+
+    // Update hidden input for state
+    updateTagsInput();
+
+    if (checkbox.checked) {
+        // Tampilkan loading visual di tabel
+        document.getElementById('tableBody').insertAdjacentHTML('afterbegin', `<tr id="loading-${tagId}"><td colspan="5" class="text-center text-muted"><div class="spinner-border spinner-border-sm me-2"></div> Menarik kontak dari segmen...</td></tr>`);
+
+        // Fetch via AJAX
+        fetch(`<?= base_url('campaigns/wizard/tag-contacts') ?>/${tagId}`)
+            .then(res => res.json())
+            .then(res => {
+                const loadingRow = document.getElementById(`loading-${tagId}`);
+                if(loadingRow) loadingRow.remove();
+
+                if (res.status === 'success' && res.data.length > 0) {
+                    const newContacts = res.data.map(c => ({
+                        email: c.email,
+                        name: c.name,
+                        source: sourceName
+                    }));
+                    addContacts(newContacts);
                 }
+            })
+            .catch(err => {
+                console.error(err);
+                const loadingRow = document.getElementById(`loading-${tagId}`);
+                if(loadingRow) loadingRow.remove();
+                showAlert('Gagal Ambil Data', 'Tidak dapat mengambil kontak dari server. Silakan coba lagi.', 'danger');
             });
-        }
-    });
-
-    function renderTable() {
-        const header = document.getElementById('tableHeader');
-        const body = document.getElementById('tableBody');
-        
-        header.innerHTML = '';
-        body.innerHTML = '';
-
-        if (globalData.length === 0) return;
-
-        // 1. Render Header Dinamis (Mengikuti columnMapping)
-        globalData[0].forEach((_, i) => {
-            const mapValue = columnMapping[i] || 'none'; // Ambil nilai mapping saat ini
-            
-            const th = document.createElement('th');
-            th.innerHTML = `
-                <select class="form-select mb-2" onchange="changeMapping(${i}, this.value)">
-                    <option value="none" ${mapValue === 'none' ? 'selected' : ''}>Abaikan</option>
-                    <option value="email" ${mapValue === 'email' ? 'selected' : ''}>Email</option>
-                    <option value="name" ${mapValue === 'name' ? 'selected' : ''}>Nama</option>
-                    <option value="custom" ${mapValue === 'custom' ? 'selected' : ''}>Custom</option>
-                </select>
-                <div class="text-muted">Kolom ${i+1}</div>
-            `;
-            header.appendChild(th);
-        });
-        header.innerHTML += `<th class="w-1 text-center"><br>Aksi</th>`;
-
-        // 2. Render Body Dinamis
-        globalData.forEach((row, rowIndex) => {
-            let tr = document.createElement('tr');
-            row.forEach((cell, colIndex) => {
-                tr.innerHTML += `
-                    <td contenteditable="true" oninput="updateData(${rowIndex}, ${colIndex}, this)">
-                        ${cell || ''}
-                    </td>`;
-            });
-            
-            tr.innerHTML += `
-                <td class="text-center">
-                    <button type="button" class="btn btn-icon btn-ghost-danger btn-sm" onclick="removeRow(${rowIndex})">
-                        <i class="ti ti-trash"></i>
-                    </button>
-                </td>`;
-            body.appendChild(tr);
-        });
-
-        // Update Meta Data & Tampilan
-        document.getElementById('rowCountBadge').innerText = globalData.length + ' Kontak';
-        document.getElementById('btnNext').disabled = false;
-        document.getElementById('previewArea').style.display = 'block';
-        
-        // Simpan setiap kali tabel di-render
-        saveToHiddenInput();
-    }
-
-    function changeMapping(index, value) {
-        columnMapping[index] = value;
-        saveToHiddenInput();
-    }
-
-    function updateData(rowIndex, colIndex, element) {
-        globalData[rowIndex][colIndex] = element.innerText.trim();
-        saveToHiddenInput();
-    }
-
-    function removeRow(index) {
-        globalData.splice(index, 1);
+    } else {
+        // Hapus kontak yang berasal dari tag ini
+        globalData = globalData.filter(r => r.source !== sourceName);
         renderTable();
     }
+}
 
-    function saveToHiddenInput() {
-        // Kita simpan Data dan Mapping-nya sekaligus
-        const finalPayload = {
-            mapping: columnMapping,
-            rows: globalData
-        };
-        document.getElementById('contacts_json').value = JSON.stringify(finalPayload);
+function updateTagsInput() {
+    const checked = document.querySelectorAll('.tag-checkbox:checked');
+    const ids = Array.from(checked).map(c => c.value);
+    document.getElementById('db_tags').value = ids.join(',');
+}
+
+
+/* =====================================================
+   TAB 3: MANUAL INPUT LOGIC
+   ===================================================== */
+document.getElementById('manualEmailInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); addManualEmail(); }
+});
+document.getElementById('manualNameInput').addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') { e.preventDefault(); addManualEmail(); }
+});
+
+function addManualEmail() {
+    const emailInput = document.getElementById('manualEmailInput');
+    const nameInput  = document.getElementById('manualNameInput');
+    const errEl      = document.getElementById('manualEmailError');
+    const email      = normalizeEmail(emailInput.value);
+    const name       = nameInput.value.trim();
+
+    errEl.style.display = 'none';
+
+    if (!email) {
+        errEl.innerText = '⚠ Email wajib diisi.';
+        errEl.style.display = 'block';
+        return;
     }
+    if (!isValidEmail(email)) {
+        errEl.innerText = '⚠ Format email tidak valid.';
+        errEl.style.display = 'block';
+        return;
+    }
+
+    const stats = addContacts([{ email, name, source: 'Input Manual' }]);
+    
+    if (stats.duplicate > 0) {
+        errEl.innerText = '⚠ Email tersebut sudah ada di tabel bawah.';
+        errEl.style.display = 'block';
+    } else {
+        emailInput.value = '';
+        nameInput.value  = '';
+        emailInput.focus();
+    }
+}
+
+
+/* =====================================================
+   SUBMIT ACTION
+   ===================================================== */
+function submitStep2(jumpToReview) {
+    // Karena updateHiddenJson() dipanggil tiap kali renderTable(), 
+    // contacts_json sudah berisi data yg bersih dan valid.
+    
+    const validCount = globalData.filter(r => isValidEmail(r.email)).length;
+    if (validCount === 0) {
+        showAlert('Daftar Kosong', 'Daftar Penerima tidak boleh kosong atau tidak valid.', 'warning');
+        return;
+    }
+
+    if (jumpToReview) {
+        const inp = document.createElement('input');
+        inp.type  = 'hidden';
+        inp.name  = 'jump_to_review';
+        inp.value = 'yes';
+        document.getElementById('formStep2').appendChild(inp);
+    }
+
+    document.getElementById('formStep2').submit();
+}
+
+function toggleSaveMaster(isChecked) {
+    document.getElementById('saveToMasterForm').value = isChecked ? '1' : '0';
+    document.getElementById('saveMasterTagArea').style.display = isChecked ? 'block' : 'none';
+}
 </script>
-
-<style>
-/* Header tetap di atas saat scroll vertikal */
-.sticky-top {
-    position: sticky;
-    top: 0;
-    z-index: 10;
-    background-color: var(--tblr-bg-surface) !important; /* Adaptasi Dark/Light Mode */
-    box-shadow: inset 0 -1px 0 var(--tblr-border-color);
-}
-
-/* Pastikan container mendukung scroll horizontal dengan smooth */
-.card-table-container {
-    overflow-x: auto; /* Scroll samping */
-    overflow-y: auto; /* Scroll bawah */
-    -webkit-overflow-scrolling: touch;
-}
-
-/* Memaksa cell untuk tidak "bungkus" teks (no-wrap) */
-#previewTable td, #previewTable th {
-    white-space: nowrap; 
-    min-width: 150px; /* Jarak aman minimal per kolom */
-    padding: 10px;
-}
-
-/* Efek khusus untuk kolom drop-down di header */
-#tableHeader th select {
-    min-width: 120px;
-}
-
-/* Base style untuk sel yang bisa diedit */
-[contenteditable="true"] {
-    padding: 4px 8px;
-    border: 1px solid transparent;
-    border-radius: 4px;
-    transition: border-color .15s ease-in-out, box-shadow .15s ease-in-out;
-    cursor: text;
-    outline: none;
-}
-
-/* Style saat diklik (Fokus) - Hanya Border & Glow */
-[contenteditable="true"]:focus {
-    /* Menggunakan variabel warna primer Tabler agar otomatis ganti warna jika tema berubah */
-    border-color: var(--tblr-primary); 
-    /* Efek Glow tipis yang transparan agar aman di dark mode */
-    box-shadow: 0 0 0 0.25rem rgba(var(--tblr-primary-rgb), .25);
-}
-
-/* Efek hover halus */
-[contenteditable="true"]:hover {
-    border-color: var(--tblr-border-color);
-    background-color: rgba(var(--tblr-primary-rgb), 0.03); /* Highlight tipis banget */
-}
-</style>
 <?= $this->endSection() ?>

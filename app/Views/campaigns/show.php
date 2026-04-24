@@ -201,31 +201,46 @@
                 <thead>
                     <tr>
                         <th>Alamat Email</th>
-                        <th>Subjek (Merge Tag)</th>
                         <th>Status</th>
-                        <th>Keterangan</th>
+                        <th class="text-center">Percobaan</th>
+                        <th class="text-center">Keterangan / Error</th>
+                        <th>Waktu</th>
                     </tr>
                 </thead>
                 <tbody>
                     <?php if(empty($recipients)): ?>
-                        <tr><td colspan="4" class="text-center py-5 text-muted">Belum ada data antrean.</td></tr>
+                        <tr><td colspan="6" class="text-center py-5 text-muted">Belum ada data antrean.</td></tr>
                     <?php endif; ?>
 
                     <?php foreach ($recipients as $row): ?>
                     <tr>
-                        <td><span class="text-muted fw-medium"><?= esc($row['to_email']) ?></span></td>
-                        <td class="text-truncate" style="max-width: 250px;" title="<?= esc($row['subject']) ?>"><?= esc($row['subject']) ?></td>
+                        <td>
+                            <div class="fw-medium"><?= esc($row['to_email']) ?></div>
+                            <div class="small text-muted text-truncate" style="max-width: 200px;"><?= esc($row['subject']) ?></div>
+                        </td>
                         <td>
                             <?php if ($row['status'] == 'SENT'): ?>
                                 <span class="badge bg-success-lt"><i class="ti ti-check me-1"></i> SENT</span>
                             <?php elseif ($row['status'] == 'FAILED'): ?>
                                 <span class="badge bg-danger-lt"><i class="ti ti-x me-1"></i> FAILED</span>
+                            <?php elseif ($row['status'] == 'PROCESSING'): ?>
+                                <span class="badge bg-blue-lt fw-bold animated-pulse">PROCESSING</span>
                             <?php else: ?>
                                 <span class="badge bg-secondary-lt">PENDING</span>
                             <?php endif; ?>
                         </td>
-                        <td class="small text-muted text-truncate" style="max-width: 200px;" title="<?= esc($row['last_error'] ?? '') ?>">
-                            <?= $row['last_error'] ? esc($row['last_error']) : '-' ?>
+                        <td class="text-center">
+                            <span class="badge badge-outline text-muted"><?= $row['attempt'] ?>/3</span>
+                        </td>
+                        <td class="text-center">
+                            <button class="btn btn-sm btn-icon btn-ghost-primary" 
+                                    onclick="showDeliveryHistory(<?= htmlspecialchars(json_encode($row['delivery_history'] ?? '[]')) ?>, '<?= esc($row['to_email']) ?>')"
+                                    title="Lihat Kronologi Pengiriman">
+                                <i class="ti ti-info-circle fs-2"></i>
+                            </button>
+                        </td>
+                        <td class="small text-muted">
+                            <?= date('d/m H:i', strtotime($row['updated_at'])) ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -262,6 +277,41 @@
     </div>
 </div>
 
+<!-- Modal History Pengiriman -->
+<div class="modal modal-blur fade" id="modal-delivery-history" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content shadow">
+
+            <div class="modal-header">
+                <div>
+                    <h5 class="modal-title mb-1">
+                        Riwayat Pengiriman
+                    </h5>
+                    <div class="text-muted small">
+                        Target: <span id="history-email-target" class="fw-bold text-primary"></span>
+                    </div>
+                </div>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+
+            <div class="modal-body">
+
+                <!-- Summary -->
+                <div id="history-summary" class="mb-3"></div>
+
+                <!-- Timeline -->
+                <ul class="list list-timeline list-timeline-simple" id="history-timeline-list"></ul>
+
+            </div>
+
+            <div class="modal-footer">
+                <button class="btn btn-primary" data-bs-dismiss="modal">Tutup</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
 <script>
 
 document.addEventListener('DOMContentLoaded', function() {
@@ -285,6 +335,90 @@ document.addEventListener('DOMContentLoaded', function() {
         });
     }
 });
+
+function showDeliveryHistory(historyJson, email) {
+    let history = [];
+
+    try {
+        history = typeof historyJson === 'string'
+            ? JSON.parse(historyJson)
+            : historyJson;
+    } catch (e) {
+        history = [];
+    }
+
+    const list = document.getElementById('history-timeline-list');
+    const emailTarget = document.getElementById('history-email-target');
+    const summary = document.getElementById('history-summary');
+
+    emailTarget.innerText = email;
+    list.innerHTML = '';
+    summary.innerHTML = '';
+
+    if (!history || history.length === 0) {
+        list.innerHTML = `
+            <li class="text-center text-muted py-4">
+                <i class="ti ti-inbox fs-2 d-block mb-2"></i>
+                Belum ada riwayat pengiriman
+            </li>
+        `;
+    } else {
+        let successCount = 0;
+        let failCount = 0;
+
+        history.forEach(item => {
+            const isSuccess = item.status === 'SUCCESS';
+
+            if (isSuccess) successCount++;
+            else failCount++;
+
+            const badge = isSuccess ? 'SUCCESS' : 'FAILED';
+
+            const iconClass = isSuccess ? 'bg-success-lt' : 'bg-danger-lt';
+            const icon = isSuccess ? 'ti-check' : 'ti-x';
+
+            list.innerHTML += `
+                <li>
+                    <div class="list-timeline-icon ${iconClass}">
+                        <i class="ti ${icon}"></i>  ${badge}
+                    </div>
+                    <div class="list-timeline-content">
+
+                        <div class="d-flex justify-content-between">
+                            <span class="fw-bold">
+                                Attempt #${item.attempt}
+                            </span>
+                        </div>
+
+                        <div class="text-muted small mb-1">
+                            <i class="ti ti-clock me-1"></i> ${item.time}
+                        </div>
+
+                        <div class="small">
+                            ${item.message || '-'}
+                        </div>
+
+                    </div>
+                </li>
+            `;
+        });
+
+        // Summary (Top Info)
+        summary.innerHTML = `
+            <div class="alert alert-info d-flex justify-content-between align-items-center mb-3">
+                <div>
+                    <strong>Total:</strong> ${history.length} percobaan
+                </div>
+                <div>
+                    <span class="badge bg-success-lt me-1">Success: ${successCount}</span>
+                    <span class="badge bg-danger-lt">Failed: ${failCount}</span>
+                </div>
+            </div>
+        `;
+    }
+
+    new bootstrap.Modal(document.getElementById('modal-delivery-history')).show();
+}
 </script>
 
 <?= $this->endSection() ?>

@@ -145,6 +145,17 @@ class CampaignController extends BaseController
         $campaign = $db->table('campaigns')->where('id', $id)->where('user_id', auth()->id())->get()->getRowArray();
         if (!$campaign) return redirect()->back()->with('error', 'Data tidak ditemukan.');
 
+        // VALIDASI KRUSIAL: Jika dari DRAFT ingin ke RUNNING
+        if ($status === 'RUNNING' && $campaign['status'] === 'DRAFT') {
+            // Cek apakah antrean email sudah di-generate (lewat Wizard Step 5)
+            $queueCount = $db->table('email_queue')->where('campaign_id', $id)->countAllResults();
+            
+            if ($queueCount === 0) {
+                return redirect()->to(url_to('app.campaigns.edit_draft', $id) . '?step=5')
+                    ->with('error', 'Kampanye belum siap dijalankan. Harap selesaikan langkah terakhir di Wizard untuk memproses antrean email.');
+            }
+        }
+
         $db->table('campaigns')->where('id', $id)->where('user_id', auth()->id())->update(['status' => $status]);
         
         $msg = ($status == 'RUNNING') ? 'dijalankan kembali.' : (($status == 'PAUSED') ? 'dihentikan sejenak.' : 'dibatalkan.');

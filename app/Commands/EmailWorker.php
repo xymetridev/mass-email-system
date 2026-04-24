@@ -244,11 +244,19 @@ class EmailWorker extends BaseCommand
 
     private function markAsSent($db, $email) {
         $now = date('Y-m-d H:i:s');
-        
-        // 1. Update status di queue (Sudah mencakup semua info target)
+        $history = json_decode($email->delivery_history ?? '[]', true);
+        $history[] = [
+            'time'    => $now,
+            'attempt' => (int)$email->attempt + 1,
+            'status'  => 'SUCCESS',
+            'message' => 'Email berhasil terkirim ke server tujuan.'
+        ];
+
+        // 1. Update status di queue
         $db->table('email_queue')->where('id', $email->id)->update([
-            'status'     => 'SENT', 
-            'updated_at' => $now
+            'status'           => 'SENT', 
+            'delivery_history' => json_encode($history),
+            'updated_at'       => $now
         ]);
 
         // 2. 🔥 CEK APAKAH INI EMAIL TERAKHIR UNTUK KAMPANYE INI?
@@ -300,12 +308,22 @@ class EmailWorker extends BaseCommand
         $backoffSeconds = min(86400, 60 * (2 ** max(0, $attempt - 1)));
         $nextAttemptAt  = $finalFailed ? null : date('Y-m-d H:i:s', time() + $backoffSeconds);
 
+        $now = date('Y-m-d H:i:s');
+        $history = json_decode($email->delivery_history ?? '[]', true);
+        $history[] = [
+            'time'    => $now,
+            'attempt' => $attempt,
+            'status'  => 'FAILED',
+            'message' => mb_substr(trim(strip_tags($error)), 0, 500, 'UTF-8')
+        ];
+
         $db->table('email_queue')->where('id', $email->id)->update([
             'status'          => $finalFailed ? 'FAILED' : 'PENDING',
             'attempt'         => $attempt,
             'next_attempt_at' => $nextAttemptAt,
             'last_error'      => mb_substr(trim(strip_tags($error)), 0, 1000, 'UTF-8'),
-            'updated_at'      => date('Y-m-d H:i:s'),
+            'delivery_history' => json_encode($history),
+            'updated_at'      => $now,
         ]);
     }
 

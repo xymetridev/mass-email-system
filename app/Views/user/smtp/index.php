@@ -117,9 +117,14 @@
                         <i class="ti ti-test-pipe me-1"></i> Test
                     </a>
                 </div>
-                <form action="<?= url_to('app.smtp.delete', $acc->id) ?>" method="POST" onsubmit="return confirm('Hapus akun ini?')">
+                <form action="<?= url_to('app.smtp.delete', $acc->id) ?>" method="POST" id="delete-form-<?= $acc->id ?>">
                     <?= csrf_field() ?>
-                    <button type="submit" class="btn btn-pill btn-danger">
+                    <button type="button" class="btn btn-pill btn-danger" 
+                            onclick="confirmAction({
+                                title: 'Hapus Akun SMTP?',
+                                text: 'Konfigurasi server ini akan dihapus permanen.',
+                                onConfirm: () => document.getElementById('delete-form-<?= $acc->id ?>').submit()
+                            })">
                         <i class="ti ti-trash"></i>
                     </button>
                 </form>

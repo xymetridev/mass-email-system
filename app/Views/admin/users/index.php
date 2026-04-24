@@ -58,9 +58,15 @@
                     <td class="text-muted small"><?= $user->created_at->toFormattedDateString() ?></td>
                     <td>
                         <?php if ($user->id !== auth()->id()) : ?>
-                            <form action="<?= site_url('admin/users/toggle/' . $user->id) ?>" method="POST" class="d-inline" onsubmit="return confirm('<?= $user->isBanned() ? 'Aktifkan kembali akun ini?' : 'Nonaktifkan/blokir akun ini?' ?>')">
+                            <form action="<?= site_url('admin/users/toggle/' . $user->id) ?>" method="POST" class="d-inline" id="toggle-form-<?= $user->id ?>">
                                 <?= csrf_field() ?>
-                                <button type="submit" class="btn btn-sm btn-<?= $user->isBanned() ? 'success' : 'outline-danger' ?>">
+                                <button type="button" class="btn btn-sm btn-<?= $user->isBanned() ? 'success' : 'outline-danger' ?>"
+                                        onclick="confirmAction({
+                                            title: '<?= $user->isBanned() ? 'Aktifkan Pengguna?' : 'Blokir Pengguna?' ?>',
+                                            text: '<?= $user->isBanned() ? 'Pengguna ini akan bisa kembali login dan menggunakan sistem.' : 'Pengguna ini tidak akan bisa login sampai diaktifkan kembali.' ?>',
+                                            type: '<?= $user->isBanned() ? 'success' : 'danger' ?>',
+                                            onConfirm: () => document.getElementById('toggle-form-<?= $user->id ?>').submit()
+                                        })">
                                     <?= $user->isBanned() ? 'Aktifkan' : 'Blokir' ?>
                                 </button>
                             </form>

@@ -86,21 +86,24 @@
     <script src="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta17/dist/js/tabler.min.js"></script>
     
     <!-- Modal Konfirmasi Global -->
-    <div class="modal modal-blur fade" id="modal-confirm-global" tabindex="-1" role="dialog" aria-hidden="true">
+    <!-- Modal Konfirmasi & Alert Global ala Tabler -->
+    <div class="modal modal-blur fade" id="modal-global" tabindex="-1" role="dialog" aria-hidden="true">
         <div class="modal-dialog modal-sm modal-dialog-centered" role="document">
             <div class="modal-content">
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                <div class="modal-status bg-danger" id="confirm-status-bar"></div>
+                <div class="modal-status bg-danger" id="global-status-bar"></div>
                 <div class="modal-body text-center py-4">
-                    <i class="ti ti-alert-triangle mb-2 text-danger display-4" id="confirm-icon"></i>
-                    <h3 id="confirm-title">Apakah anda yakin?</h3>
-                    <div class="text-muted" id="confirm-text">Tindakan ini tidak dapat dibatalkan.</div>
+                    <div id="global-icon-wrapper" class="mb-2">
+                        <i class="ti ti-alert-triangle text-danger display-4" id="global-icon"></i>
+                    </div>
+                    <h3 id="global-title">Judul</h3>
+                    <div class="text-muted" id="global-text">Konten pesan di sini.</div>
                 </div>
-                <div class="modal-footer">
+                <div class="modal-footer" id="global-footer">
                     <div class="w-100">
-                        <div class="row">
-                            <div class="col"><a href="#" class="btn w-100" data-bs-dismiss="modal">Batal</a></div>
-                            <div class="col"><a href="#" class="btn btn-danger w-100" id="confirm-btn-yes">Ya, Lanjutkan</a></div>
+                        <div class="row" id="global-footer-row">
+                            <div class="col" id="global-cancel-col"><a href="#" class="btn w-100" data-bs-dismiss="modal">Batal</a></div>
+                            <div class="col"><a href="#" class="btn btn-danger w-100" id="global-btn-ok">OK</a></div>
                         </div>
                     </div>
                 </div>
@@ -109,25 +112,57 @@
     </div>
 
     <script>
-        // Helper Konfirmasi ala Tabler
-        window.confirmAction = function(options) {
-            const modalEl = document.getElementById('modal-confirm-global');
+        // HELPER MODAL GLOBAL (Alert & Confirm)
+        window.showAlert = function(title, text, type = 'info') {
+            const modalEl = document.getElementById('modal-global');
             const modal = new bootstrap.Modal(modalEl);
             
-            document.getElementById('confirm-title').innerText = options.title || 'Konfirmasi Tindakan';
-            document.getElementById('confirm-text').innerText = options.text || 'Apakah Anda yakin ingin melanjutkan?';
+            document.getElementById('global-title').innerText = title;
+            document.getElementById('global-text').innerText = text;
             
-            const btnYes = document.getElementById('confirm-btn-yes');
-            const statusBar = document.getElementById('confirm-status-bar');
-            const icon = document.getElementById('confirm-icon');
+            // UI elements
+            const statusBar = document.getElementById('global-status-bar');
+            const icon = document.getElementById('global-icon');
+            const btnOk = document.getElementById('global-btn-ok');
+            const cancelCol = document.getElementById('global-cancel-col');
             
-            // Atur Tema (Danger, Warning, Success)
-            const type = options.type || 'danger';
-            btnYes.className = `btn btn-${type} w-100`;
+            // Set Color Theme
             statusBar.className = `modal-status bg-${type}`;
-            icon.className = `ti ti-alert-triangle mb-2 text-${type} display-4`;
+            btnOk.className = `btn btn-${type} w-100`;
+            cancelCol.style.display = 'none'; // Sembunyikan tombol batal untuk Alert biasa
             
-            btnYes.onclick = function(e) {
+            // Set Icon based on type
+            let iconClass = 'ti-info-circle';
+            if (type === 'danger') iconClass = 'ti-alert-circle';
+            if (type === 'success') iconClass = 'ti-circle-check';
+            if (type === 'warning') iconClass = 'ti-alert-triangle';
+            icon.className = `ti ${iconClass} text-${type} display-4`;
+
+            btnOk.onclick = function() { modal.hide(); };
+            modal.show();
+        };
+
+        window.confirmAction = function(options) {
+            const modalEl = document.getElementById('modal-global');
+            const modal = new bootstrap.Modal(modalEl);
+            
+            document.getElementById('global-title').innerText = options.title || 'Konfirmasi';
+            document.getElementById('global-text').innerText = options.text || 'Apakah Anda yakin?';
+            
+            const statusBar = document.getElementById('global-status-bar');
+            const icon = document.getElementById('global-icon');
+            const btnOk = document.getElementById('global-btn-ok');
+            const cancelCol = document.getElementById('global-cancel-col');
+            
+            const type = options.type || 'danger';
+            statusBar.className = `modal-status bg-${type}`;
+            btnOk.className = `btn btn-${type} w-100`;
+            btnOk.innerText = options.confirmText || 'Ya, Lanjutkan';
+            cancelCol.style.display = 'block'; 
+            
+            icon.className = `ti ti-alert-triangle text-${type} display-4`;
+            
+            btnOk.onclick = function(e) {
                 e.preventDefault();
                 modal.hide();
                 if (typeof options.onConfirm === 'function') options.onConfirm();

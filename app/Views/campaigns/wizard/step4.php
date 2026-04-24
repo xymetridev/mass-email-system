@@ -6,9 +6,14 @@
         <h2 class="page-title">Setup Kampanye</h2>
     </div>
     <div>
-        <a href="<?= url_to('app.campaigns.wizard.cancel') ?>" class="btn btn-outline-danger btn-sm shadow-sm" onclick="return confirm('Yakin ingin membatalkan edit dan kembali ke dashboard?')">
+        <button type="button" class="btn btn-outline-danger btn-sm shadow-sm" 
+                onclick="confirmAction({
+                    title: 'Batalkan Edit?',
+                    text: 'Perubahan yang belum disimpan akan hilang. Kembali ke dashboard?',
+                    onConfirm: () => window.location.href = '<?= url_to('app.campaigns.wizard.cancel') ?>'
+                })">
             <i class="ti ti-x me-1"></i> Batal & Keluar
-        </a>
+        </button>
     </div>
 </div>
 <div class="container-xl">

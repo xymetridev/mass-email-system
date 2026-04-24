@@ -54,10 +54,14 @@
                     </td>
                     <td class="text-end">
                         <div class="d-flex justify-content-end gap-2">
-                            <?php if ($c['status'] == 'DRAFT' || $c['status'] == 'PAUSED'): ?>
+                            <?php if ($c['status'] == 'DRAFT'): ?>
+                                <a href="<?= url_to('app.campaigns.edit_draft', $c['id']) ?>" class="btn btn-icon btn-ghost-primary" title="Lanjutkan Setup Wizard">
+                                    <i class="ti ti-wand"></i>
+                                </a>
+                            <?php elseif ($c['status'] == 'PAUSED'): ?>
                                 <form method="POST" action="<?= url_to('app.campaigns.update_status', $c['id'], 'RUNNING') ?>" class="d-inline">
                                     <?= csrf_field() ?>
-                                    <button type="submit" class="btn btn-icon btn-ghost-success" title="Jalankan">
+                                    <button type="submit" class="btn btn-icon btn-ghost-success" title="Jalankan Kembali">
                                         <i class="ti ti-player-play"></i>
                                     </button>
                                 </form>

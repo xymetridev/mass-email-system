@@ -33,9 +33,14 @@
         <div class="card-body">
             <div class="row mb-3">
                 <div class="col-md-8">
-                    <label class="form-label required">Subjek Email</label>
-                    <input type="text" name="subject" id="subject" class="form-control" 
-                         value="<?= esc($wizard['subject'] ?? '') ?>" placeholder="Contoh: Halo {{name}}, ada promo untukmu!">
+                    <label class="form-label required">Subjek Email <span class="text-danger">*</span></label>
+                    <input type="text" name="subject" id="subject" class="form-control"
+                         value="<?= esc($wizard['subject'] ?? '') ?>"
+                         placeholder="Contoh: Halo {{name}}, ada promo untukmu!"
+                         autocomplete="off">
+                    <div id="subject-error" class="text-danger small mt-1" style="display:none;">
+                        &#9888; Subjek email wajib diisi sebelum melanjutkan.
+                    </div>
                 </div>
                 <div class="col-md-4">
                     <label class="form-label">Tersedia Merge Tags</label>
@@ -233,22 +238,46 @@ function createToastContainer() {
 
     function submitContent(jumpToReview = false) {
         if (!window.editor) return;
-        
+
+        // VALIDASI SUBJECT (Client-side)
+        const subjectEl  = document.getElementById('subject');
+        const subjectErr = document.getElementById('subject-error');
+        const subjectVal = subjectEl.value.trim();
+
+        if (!subjectVal) {
+            subjectEl.classList.add('is-invalid');
+            subjectErr.style.display = 'block';
+            subjectEl.focus();
+            subjectEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            return; // BLOK SUBMIT
+        }
+
+        // Hapus error jika sudah valid
+        subjectEl.classList.remove('is-invalid');
+        subjectErr.style.display = 'none';
+
         const html = window.editor.runCommand('gjs-get-inlined-html');
-        document.getElementById('email_html').value = html;
-        document.getElementById('final_subject').value = document.getElementById('subject').value;
-        
-        // Jika tombol jalan pintas diklik, tambahkan input tersembunyi
+        document.getElementById('email_html').value    = html;
+        document.getElementById('final_subject').value = subjectVal;
+
         if (jumpToReview) {
-            let jumpInput = document.createElement('input');
-            jumpInput.type = 'hidden';
-            jumpInput.name = 'jump_to_review';
+            let jumpInput   = document.createElement('input');
+            jumpInput.type  = 'hidden';
+            jumpInput.name  = 'jump_to_review';
             jumpInput.value = 'yes';
             document.getElementById('formStep3').appendChild(jumpInput);
         }
-        
+
         document.getElementById('formStep3').submit();
     }
+
+    // Hapus error saat user mulai mengetik di subject
+    document.getElementById('subject').addEventListener('input', function () {
+        if (this.value.trim()) {
+            this.classList.remove('is-invalid');
+            document.getElementById('subject-error').style.display = 'none';
+        }
+    });
 
     // Fungsi Load Template via AJAX
     function loadTemplate(id) {

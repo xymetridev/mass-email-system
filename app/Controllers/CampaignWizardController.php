@@ -135,82 +135,109 @@ class CampaignWizardController extends BaseController
         }
 
         if ($step == 2 && isset($wizard['campaign_id'])) {
-            $sourceMode = $input['source_mode'] ?? 'upload';
             $contactsJson = $input['contacts_json'] ?? null;
-            
-            if ($sourceMode == 'database') {
-                $tagIds = explode(',', $input['db_tags']);
-                $contacts = $db->table('contacts')
-                    ->select('contacts.email, contacts.name')
-                    ->join('recipient_tags', 'recipient_tags.contact_id = contacts.id')
-                    ->whereIn('recipient_tags.tag_id', $tagIds)
-                    ->groupBy('contacts.email')
-                    ->groupBy('contacts.name')
-                    ->get()->getResultArray();
 
-                $rows = [];
-                foreach ($contacts as $c) {
-                    $rows[] = [$c['email'], $c['name']];
+            // -- SEMUA SUMBER (Upload/Database/Manual) sudah digabung di FE (contacts_json) --
+            $parsed  = json_decode($contactsJson ?? '{}', true);
+            $mapping = $parsed['mapping'] ?? [];
+            $rows    = $parsed['rows'] ?? [];
+
+            $emailIdx = array_search('email', $mapping);
+            if ($emailIdx === false) {
+                return redirect()->back()->with('error', 'Format data tidak valid (Kolom Email tidak ditemukan).');
+            }
+
+                // Normalisasi + filter invalid + dedupe
+                $seen       = [];
+                $validRows  = [];
+                $skipped    = 0;
+
+                foreach ($rows as $row) {
+                    $email = strtolower(trim($row[$emailIdx] ?? ''));
+                    if (!$email || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                        $skipped++;
+                        continue;
+                    }
+                    if (isset($seen[$email])) {
+                        $skipped++;
+                        continue;
+                    }
+                    $seen[$email]       = true;
+                    $row[$emailIdx]     = $email; // simpan kembali yg sudah dinormalisasi
+                    $validRows[]        = $row;
                 }
 
-                $contactsJson = json_encode([
-                    'mapping' => ['email', 'name'],
-                    'rows'    => $rows
-                ]);
-            } else {
-                // Jika Upload CSV + Save to Master
-                if ($this->request->getPost('save_to_master_form')) {
-                    $tagId = $this->request->getPost('tag_id_form');
-                    $parsed = json_decode($contactsJson, true);
-                    $rows = $parsed['rows'] ?? [];
-                    $mapping = $parsed['mapping'] ?? [];
-                    $emailIdx = array_search('email', $mapping);
-                    $nameIdx = array_search('name', $mapping);
+                if (empty($validRows)) {
+                    return redirect()->back()->with('error', 'Tidak ada email yang valid. Periksa kembali data Anda.');
+                }
 
-                    if ($emailIdx !== false) {
-                        foreach ($rows as $row) {
-                            $email = $row[$emailIdx];
-                            $name = ($nameIdx !== false) ? ($row[$nameIdx] ?? '') : '';
-                            
-                            try {
-                                $db->table('contacts')->insert([
-                                    'user_id' => auth()->id(),
-                                    'email'   => $email,
-                                    'name'    => $name,
-                                    'created_at' => date('Y-m-d H:i:s')
-                                ]);
-                                $cid = $db->insertID();
-                                if ($tagId) {
-                                    $db->table('recipient_tags')->insert(['contact_id' => $cid, 'tag_id' => $tagId]);
-                                }
-                            } catch (\Exception $e) {}
+                $contactsJson = json_encode(['mapping' => $mapping, 'rows' => $validRows]);
+
+                // -- Simpan ke Master jika diaktifkan --
+                if ($input['save_to_master_form'] ?? false) {
+                    $tagId     = $input['tag_id_form'] ?? null;
+                    $nameIdx   = array_search('name', $mapping);
+                    $contactModel = new \App\Models\ContactModel();
+
+                    foreach ($validRows as $row) {
+                        $email = $row[$emailIdx];
+                        $name  = ($nameIdx !== false) ? ($row[$nameIdx] ?? '') : '';
+
+                        // Skip jika sudah ada (cegah duplikat insert)
+                        $exists = $db->table('contacts')
+                            ->where('email', $email)
+                            ->where('user_id', auth()->id())
+                            ->countAllResults();
+
+                        if ($exists) continue;
+
+                        try {
+                            $contactModel->insert([
+                                'user_id'    => auth()->id(),
+                                'email'      => $email,
+                                'name'       => $name,
+                                'created_at' => date('Y-m-d H:i:s')
+                            ]);
+                            $cid = $contactModel->insertID();
+                            if ($tagId) {
+                                $db->table('recipient_tags')->ignore(true)->insert(['contact_id' => $cid, 'tag_id' => $tagId]);
+                            }
+                        } catch (\Exception $e) {
+                            // Skip gracefully
                         }
                     }
                 }
-            }
+
 
             $db->table('campaigns')->where('id', $wizard['campaign_id'])->update([
                 'contacts_json' => $contactsJson
             ]);
 
             $wizard['contacts_json'] = $contactsJson;
-            $wizard['source_mode']   = $sourceMode;
+            // source_mode and db_tags are kept for UI state restoration if needed
+            $wizard['source_mode']   = $input['source_mode'] ?? 'upload';
             $wizard['db_tags']       = $input['db_tags'] ?? '';
             $wizard['max_step']      = max($wizard['max_step'] ?? 1, 3);
             session()->set('campaign_wizard', $wizard);
-            
+
             $campaignName = $wizard['campaign_name'] ?? 'Tanpa Nama';
             record_activity('WIZARD_RECIPIENTS', "Mengatur target penerima untuk kampanye '{$campaignName}'.");
-            
+
             return redirect()->to(url_to('app.campaigns.wizard', 3))->with('success', 'Penerima berhasil diatur.');
         }
 
         if ($step == 3 && isset($wizard['campaign_id'])) {
+            // SERVER-SIDE: Subject wajib tidak kosong
+            $subject = trim($input['subject'] ?? '');
+            if (empty($subject)) {
+                return redirect()->back()->withInput()->with('error', 'Subjek email wajib diisi sebelum melanjutkan.');
+            }
+
             $db->table('campaigns')->where('id', $wizard['campaign_id'])->update([
-                'subject' => $input['subject'] ?? '',
+                'subject' => $subject,
                 'content' => $input['email_html'] ?? ''
             ]);
-            
+
             $campaignName = $wizard['campaign_name'] ?? 'Tanpa Nama';
             record_activity('WIZARD_CONTENT', "Mengubah konten email kampanye '{$campaignName}'.");
         }
@@ -278,29 +305,30 @@ class CampaignWizardController extends BaseController
 
         $queueData = [];
         $baseSubject = $campaign['subject'] ?? '';
-        $baseHtml = $campaign['content'] ?? '';
+        $baseHtml    = $campaign['content'] ?? '';
         $existingEmails = [];
 
         foreach ($rows as $row) {
-            if (!isset($row[$emailIdx]) || empty(trim($row[$emailIdx]))) continue;
+            if (!isset($row[$emailIdx])) continue;
+
+            // Normalisasi server-side final
+            $toEmail = strtolower(trim($row[$emailIdx]));
+
+            // Skip jika kosong, format tidak valid, atau duplikat
+            if (!$toEmail || !filter_var($toEmail, FILTER_VALIDATE_EMAIL)) continue;
+            if (isset($existingEmails[$toEmail])) continue;
+            $existingEmails[$toEmail] = true;
 
             $personalSubject = $baseSubject;
-            $personalBody = $baseHtml;
+            $personalBody    = $baseHtml;
 
-            // --- SISTEM REPLACE MERGE TAGS ---
+            // Replace Merge Tags
             foreach ($mapping as $index => $tag) {
                 if ($tag !== 'none' && isset($row[$index])) {
-                    // Gunakan str_ireplace agar tidak sensitif terhadap huruf besar/kecil
                     $personalSubject = str_ireplace('{{' . $tag . '}}', $row[$index], $personalSubject);
                     $personalBody    = str_ireplace('{{' . $tag . '}}', $row[$index], $personalBody);
                 }
             }
-
-            $toEmail = trim($row[$emailIdx]);
-
-            // Cegah duplikat email akibat user manual edit di Step 2 (mencegah crash saat insertBatch)
-            if (isset($existingEmails[$toEmail])) continue;
-            $existingEmails[$toEmail] = true;
 
             $queueData[] = [
                 'campaign_id'       => $campaign['id'],
@@ -364,5 +392,21 @@ class CampaignWizardController extends BaseController
         // Bersihkan session dan tendang kembali ke Index
         session()->remove('campaign_wizard');
         return redirect()->to(url_to('app.campaigns'))->with('info', 'Edit dibatalkan. Status kampanye tidak berubah.');
+    }
+
+    /**
+     * AJAX ENDPOINT: Mengambil kontak berdasarkan Tag ID untuk fitur Merge di Wizard Step 2
+     */
+    public function getTagContacts($tagId)
+    {
+        $db = \Config\Database::connect();
+        $contacts = $db->table('contacts')
+            ->select('email, name')
+            ->join('recipient_tags', 'recipient_tags.contact_id = contacts.id')
+            ->where('recipient_tags.tag_id', $tagId)
+            ->where('contacts.user_id', auth()->id())
+            ->get()->getResultArray();
+            
+        return $this->response->setJSON(['status' => 'success', 'data' => $contacts]);
     }
 }
