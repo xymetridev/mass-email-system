@@ -46,19 +46,16 @@ class Auth extends ShieldAuth
      * --------------------------------------------------------------------
      */
     public array $views = [
-        'login'                       => 'vendor/CodeIgniterShield/login',
-        'register'                    => 'vendor/CodeIgniterShield/register',
-        'layout'                      => 'vendor/CodeIgniterShield/layout',
-        // 'login'                       => '\CodeIgniter\Shield\Views\login',
-        // 'register'                    => '\CodeIgniter\Shield\Views\register',
-        // 'layout'                      => '\CodeIgniter\Shield\Views\layout',
+        'login'                       => 'auth_custom/CodeIgniterShield/login',
+        'register'                    => 'auth_custom/CodeIgniterShield/register',
+        'layout'                      => 'auth_custom/CodeIgniterShield/layout',
         'action_email_2fa'            => '\CodeIgniter\Shield\Views\email_2fa_show',
         'action_email_2fa_verify'     => '\CodeIgniter\Shield\Views\email_2fa_verify',
         'action_email_2fa_email'      => '\CodeIgniter\Shield\Views\Email\email_2fa_email',
         'action_email_activate_show'  => '\CodeIgniter\Shield\Views\email_activate_show',
         'action_email_activate_email' => '\CodeIgniter\Shield\Views\Email\email_activate_email',
-        'magic-link-login'            => 'vendor/CodeIgniterShield/magic_link_form',
-        'magic-link-message'          => 'vendor/CodeIgniterShield/magic_link_message',
+        'magic-link-login'            => 'auth_custom/CodeIgniterShield/magic_link_form',
+        'magic-link-message'          => 'auth_custom/CodeIgniterShield/magic_link_message',
         'magic-link-email'            => '\CodeIgniter\Shield\Views\Email\magic_link_email',
     ];
 
