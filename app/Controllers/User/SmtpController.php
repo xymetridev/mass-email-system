@@ -52,6 +52,7 @@ class SmtpController extends BaseController
         $data['smtp_password'] = base64_encode(service('encrypter')->encrypt($data['smtp_password']));
 
         if ($this->smtpModel->save($data)) {
+            record_activity('CREATE_SMTP', "Menambahkan SMTP baru '{$data['smtp_host']}' untuk '{$data['sender_email']}'.");
             return redirect()->to(url_to('app.smtp'))->with('success', 'SMTP berhasil ditambahkan.');
         }
 
@@ -85,6 +86,7 @@ class SmtpController extends BaseController
         }
 
         if ($this->smtpModel->update($id, $data)) {
+            record_activity('UPDATE_SMTP', "Mengubah konfigurasi SMTP '{$account->smtp_host}' ({$account->sender_email}).", ['account_id' => $id]);
             return redirect()->to(url_to('app.smtp'))->with('success', 'Update berhasil.');
         }
 
@@ -112,6 +114,7 @@ class SmtpController extends BaseController
         }
 
         $this->smtpModel->delete($id);
+        record_activity('DELETE_SMTP', "Menghapus pengaturan SMTP '{$account->smtp_host}'.");
         return redirect()->to(url_to('app.smtp'))->with('success', 'Akun SMTP berhasil dihapus.');
     }
 
@@ -142,11 +145,14 @@ class SmtpController extends BaseController
         $email->setMessage('Jika Anda menerima email ini, berarti konfigurasi SMTP & Enkripsi Anda <b>BERHASIL!</b>');
 
         if ($email->send()) {
+            record_activity('TEST_SMTP_SUCCESS', "Berhasil melakukan tes koneksi ke SMTP '{$sender->smtp_host}'.");
             return redirect()->back()->with('success', 'Koneksi Sukses! Email tes telah dikirim ke ' . $sender->sender_email);
         }
 
         $debugger = $email->printDebugger(['headers', 'subject', 'body']);
         log_message('error', 'SMTP Test Failure: ' . $debugger);
+        
+        record_activity('TEST_SMTP_FAILED', "Gagal melakukan tes koneksi ke SMTP '{$sender->smtp_host}'.");
 
         return redirect()->back()
             ->with('error', 'Gagal mengirim email. Silakan cek log debug di bawah.')

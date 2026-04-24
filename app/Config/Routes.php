@@ -25,6 +25,9 @@ $routes->post('logout', '\CodeIgniter\Shield\Controllers\LoginController::logout
 // ====================================================================
 $routes->group('', ['filter' => 'auth'], static function ($routes) {
     
+    $routes->get('set-password', 'AuthController::setPasswordView', ['as' => 'set-password-view']);
+    $routes->post('set-password', 'AuthController::setPasswordUpdate', ['as' => 'set-password-update']);
+    
     // Dashboard User
     $routes->get('user/dashboard', 'User\Dashboard::index', ['as' => 'user.dashboard']);
     $routes->get('user/dashboard/getStats', 'User\Dashboard::getStats');
@@ -132,6 +135,7 @@ $routes->group('admin', ['filter' => ['auth', 'group:admin']], static function (
     $routes->post('smtp/update/(:num)', 'Admin\SmtpController::update/$1', ['as' => 'admin.smtp.update']);
     $routes->post('smtp/delete/(:num)', 'Admin\SmtpController::delete/$1', ['as' => 'admin.smtp.delete']);
 });
+
 
 // --- TRACKING ROUTES (PUBLIC ACCESS) ---
 $routes->get('track/open/(:num)', 'TrackingController::open/$1');

@@ -280,6 +280,8 @@ class CampaignController extends BaseController
             fputcsv($output, $row);
         }
 
+        record_activity('EXPORT_CAMPAIGN_REPORT', "Mengekspor laporan kampanye '{$campaign['name']}' ke CSV (" . count($recipients) . " data).");
+
         fclose($output);
         exit;
     }

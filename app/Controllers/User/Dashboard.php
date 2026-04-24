@@ -11,6 +11,11 @@ class Dashboard extends BaseController
         $db = \Config\Database::connect();
         $userId = auth()->id();
 
+        // Cek apakah user sedang login dan wajib ganti password
+        if (auth()->user()->forcePasswordReset) {
+            return redirect()->to(url_to('set-password-view'))->with('error', 'Silakan buat password baru untuk keamanan akun Anda.');
+        }
+        
         // 1. Statistik Ringkas (query langsung ke email_queue, bukan recipients)
         $data['total_campaigns'] = $db->table('campaigns')
             ->where('user_id', $userId)

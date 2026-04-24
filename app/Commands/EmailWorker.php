@@ -128,7 +128,7 @@ class EmailWorker extends BaseCommand
                 
                 $emailService->setFrom($sender->sender_email, $sender->sender_name);
                 if (!filter_var($email->to_email, FILTER_VALIDATE_EMAIL)) {
-                    $this->markAsFailed($db, $email, 'Invalid recipient email format');
+                    $this->markAsFailed($db, $email, 'Invalid recipient email format', $sender);
                     continue;
                 }
                 $emailService->setTo($email->to_email);
@@ -184,7 +184,7 @@ class EmailWorker extends BaseCommand
 
                     CLI::write("Sukses: " . $email->to_email, 'green');
                 } else {
-                    $this->markAsFailed($db, $email, $emailService->printDebugger(['headers', 'subject', 'body']));
+                    $this->markAsFailed($db, $email, $emailService->printDebugger(['headers', 'subject', 'body']), $sender);
                     CLI::write("Gagal: " . $email->to_email, 'red');
 
                     $debug = $emailService->printDebugger(['headers', 'subject']);
@@ -195,7 +195,7 @@ class EmailWorker extends BaseCommand
                 }
 
             } catch (\Exception $e) {
-                $this->markAsFailed($db, $email, $e->getMessage());
+                $this->markAsFailed($db, $email, $e->getMessage(), $sender);
             }
 
             // Clear data email service untuk loop berikutnya
@@ -256,7 +256,7 @@ class EmailWorker extends BaseCommand
         }
     }
 
-    private function markAsFailed($db, $email, $error)
+    private function markAsFailed($db, $email, $error, $sender = null)
     {
         $attempt = (int)$email->attempt + 1;
 
@@ -276,8 +276,9 @@ class EmailWorker extends BaseCommand
 
             // Masukkan ke suppression list
             $db->table('suppression_list')->insert([
-                'email' => $email->to_email,
-                'reason' => 'Hard bounce',
+                'user_id'    => $sender ? $sender->user_id : 0,
+                'email'      => $email->to_email,
+                'reason'     => 'Hard bounce',
                 'created_at' => date('Y-m-d H:i:s')
             ]);
 
@@ -317,14 +318,16 @@ class EmailWorker extends BaseCommand
                 $template = $db->table('templates')->where('id', $step['template_id'])->get()->getRowArray();
                 
                 $db->table('email_queue')->insert([
-                    'campaign_id'  => 0,
-                    'to_email'     => $contact['email'],
-                    'subject'      => $template['name'],
-                    'body'         => $template['content'],
-                    'status'       => 'PENDING',
-                    'scheduled_at' => $now,
-                    'created_at'   => $now,
-                    'updated_at'   => $now
+                    'campaign_id'       => 0,
+                    'recipient_id'      => $contact['id'],
+                    'sender_account_id' => $automation['sender_account_id'] ?? 0, // Pastikan ada sender_id
+                    'to_email'          => $contact['email'],
+                    'subject'           => $template['name'],
+                    'body'              => $template['content'],
+                    'status'            => 'PENDING',
+                    'scheduled_at'      => $now,
+                    'created_at'        => $now,
+                    'updated_at'        => $now
                 ]);
 
                 $nextStep = $db->table('automation_steps')

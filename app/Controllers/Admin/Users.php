@@ -58,6 +58,11 @@ class Users extends BaseController
         // Aktifkan langsung akunnya (karena dibuat oleh admin, tidak perlu email aktivasi)
         $newUser->activate();
 
+        $newUser->forcePasswordReset();
+        $userModel->save($newUser);
+
+        record_activity('ADMIN_CREATE_USER', "Admin membuat akun baru '{$newUser->username}' ({$newUser->email}) dengan role '{$role}'.");
+
         return redirect()->back()->with('success', "Akun {$newUser->username} berhasil dibuat. Silakan instruksikan user untuk login via Magic Link.");
     }
 
@@ -69,10 +74,12 @@ class Users extends BaseController
 
         if ($user->isBanned()) {
             $user->unBan();
+            record_activity('UNBAN_USER', "Mengaktifkan kembali akun '{$user->username}'.");
             return redirect()->back()->with('success', "Akun {$user->username} telah diaktifkan kembali.");
         }
 
         $user->ban();
+        record_activity('BAN_USER', "Menonaktifkan akun '{$user->username}'.");
         return redirect()->back()->with('success', "Akun {$user->username} berhasil dinonaktifkan.");
     }
 }

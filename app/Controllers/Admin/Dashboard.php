@@ -16,6 +16,12 @@ class Dashboard extends BaseController
         $smtpModel = new SenderAccountModel();
         $userModel = new UserModel();
 
+        // Cek apakah user sedang login dan wajib ganti password
+        if (auth()->user()->forcePasswordReset) {
+            return redirect()->to(url_to('set-password-view'))
+                            ->with('error', 'Silakan buat password baru untuk keamanan akun Anda.');
+        }
+        
         // 1. Statistik Global Sistem
         $data['total_users']      = $userModel->countAllResults();
         $data['total_smtp']       = $smtpModel->countAllResults();

@@ -1,3 +1,32 @@
+<?php
+function getActionColor($action) {
+    if (strpos($action, 'DELETE') !== false || strpos($action, 'FAILED') !== false || strpos($action, 'BAN') !== false) return 'red';
+    if (strpos($action, 'UPDATE') !== false || strpos($action, 'EDIT') !== false || strpos($action, 'PAUSE') !== false || strpos($action, 'DUPLICATE') !== false) return 'yellow';
+    if (strpos($action, 'CREATE') !== false || strpos($action, 'IMPORT') !== false || strpos($action, 'SUCCESS') !== false || strpos($action, 'LAUNCH') !== false || strpos($action, 'STORE') !== false) return 'green';
+    return 'blue';
+}
+
+function parseUserAgentStr($ua) {
+    $os = 'Unknown OS';
+    $browser = 'Unknown Browser';
+    if (preg_match('/windows nt 11/i', $ua)) $os = 'Windows 11';
+    elseif (preg_match('/windows nt 10/i', $ua)) $os = 'Windows 10';
+    elseif (preg_match('/mac os x/i', $ua)) $os = 'Mac OS';
+    elseif (preg_match('/linux/i', $ua)) $os = 'Linux';
+    elseif (preg_match('/android/i', $ua)) $os = 'Android';
+    elseif (preg_match('/iphone|ipad/i', $ua)) $os = 'iOS';
+    
+    if (preg_match('/edg/i', $ua)) $browser = 'Edge';
+    elseif (preg_match('/chrome/i', $ua)) $browser = 'Chrome';
+    elseif (preg_match('/firefox/i', $ua)) $browser = 'Firefox';
+    elseif (preg_match('/safari/i', $ua)) $browser = 'Safari';
+    
+    if (empty($ua)) return 'System/Cron';
+    if (strpos($ua, 'Postman') !== false) return 'Postman / API';
+    
+    return $os . ' • ' . $browser;
+}
+?>
 <?= $this->extend('layout/main') ?>
 
 <?= $this->section('content') ?>
@@ -63,19 +92,25 @@
                                 </div>
                             </td>
                             <td>
-                                <span class="badge badge-outline text-azure border-azure-lt fw-medium small">
+                                <?php $color = getActionColor($log['action']); ?>
+                                <span class="badge badge-outline text-<?= $color ?> border-<?= $color ?>-lt fw-medium small">
                                     <?= esc($log['action']) ?>
                                 </span>
                             </td>
                             <td>
-                                <div class="text-dark small" style="max-width: 300px; white-space: normal;">
+                                <div class="text-dark small mb-1" style="max-width: 300px; white-space: normal;">
                                     <?= esc($log['description']) ?>
                                 </div>
+                                <?php if(!empty($log['context'])): ?>
+                                    <button class="btn btn-sm btn-light py-0 px-2 text-muted" onclick='showContext(<?= json_encode($log['context']) ?>)'>
+                                        <i class="ti ti-code me-1"></i> Lihat Data
+                                    </button>
+                                <?php endif; ?>
                             </td>
                             <td class="text-muted small">
                                 <div><i class="ti ti-world me-1"></i> <?= esc($log['ip_address']) ?></div>
                                 <div class="text-truncate" style="max-width: 150px;" title="<?= esc($log['user_agent']) ?>">
-                                    <i class="ti ti-device-laptop me-1"></i> <?= esc($log['user_agent']) ?>
+                                    <i class="ti ti-device-laptop me-1"></i> <?= parseUserAgentStr($log['user_agent']) ?>
                                 </div>
                             </td>
                         </tr>
@@ -138,7 +173,32 @@
     </div>
 </div>
 
+<!-- Modal JSON Context -->
+<div class="modal modal-blur fade" id="modal-context" tabindex="-1" role="dialog" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" role="document">
+        <div class="modal-content shadow-lg border-0">
+            <div class="modal-header">
+                <h5 class="modal-title"><i class="ti ti-code me-2"></i>Data Konteks (JSON)</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-0">
+                <pre id="context-content" class="p-3 m-0 bg-dark text-light" style="font-size: 12px; max-height: 400px; overflow-y: auto;"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
 <script>
+function showContext(jsonStr) {
+    try {
+        const obj = typeof jsonStr === 'string' ? JSON.parse(jsonStr) : jsonStr;
+        document.getElementById('context-content').innerText = JSON.stringify(obj, null, 4);
+    } catch (e) {
+        document.getElementById('context-content').innerText = jsonStr;
+    }
+    new bootstrap.Modal(document.getElementById('modal-context')).show();
+}
+
 function readLog(fileName) {
     const modalElement = document.getElementById('modal-log');
     const bootstrapModal = new bootstrap.Modal(modalElement);

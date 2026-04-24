@@ -25,7 +25,10 @@ class CampaignWizardController extends BaseController
         // Ciri-ciri sedang edit: Di session sudah ada 'campaign_id', tapi 'campaign_name' masih kosong
         if (isset($wizard['campaign_id']) && empty($wizard['campaign_name'])) {
             $db = \Config\Database::connect();
-            $campaign = $db->table('campaigns')->where('id', $wizard['campaign_id'])->get()->getRowArray();
+            $campaign = $db->table('campaigns')
+                           ->where('id', $wizard['campaign_id'])
+                           ->where('user_id', auth()->id())
+                           ->get()->getRowArray();
             
             if ($campaign) {
                 $origStatus = $wizard['original_status'] ?? null;
@@ -124,8 +127,10 @@ class CampaignWizardController extends BaseController
                 $dataDB['created_at'] = date('Y-m-d H:i:s');
                 $db->table('campaigns')->insert($dataDB);
                 $wizard['campaign_id'] = $db->insertID();
+                record_activity('WIZARD_INFO', "Memulai draft kampanye baru bernama '{$input['campaign_name']}'.");
             } else {
                 $db->table('campaigns')->where('id', $wizard['campaign_id'])->update($dataDB);
+                record_activity('WIZARD_INFO', "Mengupdate info dasar kampanye '{$input['campaign_name']}'.");
             }
         }
 
@@ -194,6 +199,9 @@ class CampaignWizardController extends BaseController
             $wizard['max_step']      = max($wizard['max_step'] ?? 1, 3);
             session()->set('campaign_wizard', $wizard);
             
+            $campaignName = $wizard['campaign_name'] ?? 'Tanpa Nama';
+            record_activity('WIZARD_RECIPIENTS', "Mengatur target penerima untuk kampanye '{$campaignName}'.");
+            
             return redirect()->to(url_to('app.campaigns.wizard', 3))->with('success', 'Penerima berhasil diatur.');
         }
 
@@ -202,6 +210,9 @@ class CampaignWizardController extends BaseController
                 'subject' => $input['subject'] ?? '',
                 'content' => $input['email_html'] ?? ''
             ]);
+            
+            $campaignName = $wizard['campaign_name'] ?? 'Tanpa Nama';
+            record_activity('WIZARD_CONTENT', "Mengubah konten email kampanye '{$campaignName}'.");
         }
 
         if ($step == 4 && isset($wizard['campaign_id'])) {
@@ -210,6 +221,10 @@ class CampaignWizardController extends BaseController
                 'scheduled_at' => ($sendMode == 'now') ? date('Y-m-d H:i:s') : $input['scheduled_at'],
                 'status'       => ($sendMode == 'now') ? 'READY' : 'SCHEDULED'
             ]);
+            
+            $campaignName = $wizard['campaign_name'] ?? 'Tanpa Nama';
+            $schedText = ($sendMode == 'now') ? "sekarang" : "pada {$input['scheduled_at']}";
+            record_activity('WIZARD_SCHEDULE', "Mengatur jadwal tayang kampanye '{$campaignName}' untuk {$schedText}.");
         }
 
         // 2. Update Session (Gunakan loop agar tidak menimpa data step lain yang tidak ada di form saat ini)
@@ -299,19 +314,32 @@ class CampaignWizardController extends BaseController
             ];
         }
 
-        if (!empty($queueData)) {
-            // --- TAMBAHKAN BARIS INI: Sapu bersih antrean lama milik kampanye ini ---
-            $db->table('email_queue')->where('campaign_id', $campaign['id'])->delete();
+            $db->transStart();
             
-            // Baru masukkan data yang paling *fresh*
-            $db->table('email_queue')->insertBatch($queueData);
+            // Hapus HANYA yang masih PENDING agar yang sudah SENT tidak hilang
+            $db->table('email_queue')
+               ->where('campaign_id', $campaign['id'])
+               ->where('status', 'PENDING')
+               ->delete();
+            
+            // Baru masukkan data yang paling *fresh* dengan ignore(true) untuk menghindari konflik Unique Key
+            $db->table('email_queue')->ignore(true)->insertBatch($queueData);
+            
+            // Hitung total ulang yang ada di antrean
+            $realTotal = $db->table('email_queue')->where('campaign_id', $campaign['id'])->countAllResults();
             
             // Update jumlah total target di tabel campaigns
             $db->table('campaigns')->where('id', $campaign['id'])->update([
-                'total_targets' => count($queueData)
+                'total_targets' => $realTotal
             ]);
-        }
-
+            
+            $db->transComplete();
+            
+            if ($db->transStatus() === false) {
+                return redirect()->back()->with('error', 'Gagal memproses antrean ke database.');
+            }
+            
+        record_activity('CAMPAIGN_LAUNCH', "Resmi meluncurkan kampanye '{$campaign['name']}' ke antrean sistem dengan {$realTotal} target.");
         session()->remove('campaign_wizard');
         return redirect()->to(url_to('app.campaigns'))->with('success', 'Kampanye berhasil diluncurkan!');
     }

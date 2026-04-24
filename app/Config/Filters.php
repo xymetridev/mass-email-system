@@ -39,6 +39,7 @@ class Filters extends BaseFilters
         'auth'  => SessionAuth::class,
         'group' => GroupFilter::class,
         'throttler' => \App\Filters\Throttle::class,
+        'forcePasswordReset' => \App\Filters\ForcePasswordReset::class,
     ];
 
     /**
@@ -79,6 +80,7 @@ class Filters extends BaseFilters
         'before' => [
             // 'honeypot',
             'csrf',
+            'forcePasswordReset',
             // 'invalidchars',
         ],
         'after' => [

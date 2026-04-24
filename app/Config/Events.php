@@ -53,3 +53,28 @@ Events::on('pre_system', static function (): void {
         }
     }
 });
+
+/*
+ * --------------------------------------------------------------------
+ * Shield Authentication Event Logging
+ * --------------------------------------------------------------------
+ */
+Events::on('login', static function ($user) {
+    if (function_exists('record_activity')) {
+        record_activity('LOGIN_SUCCESS', "User '{$user->username}' berhasil login.", ['user_id' => $user->id]);
+    }
+});
+
+Events::on('logout', static function ($user) {
+    if (function_exists('record_activity') && $user) {
+        record_activity('LOGOUT', "User '{$user->username}' melakukan logout.", ['user_id' => $user->id]);
+    }
+});
+
+Events::on('failedLogin', static function ($credentials) {
+    if (function_exists('record_activity')) {
+        $email = $credentials['email'] ?? 'unknown';
+        // Note: auth()->id() might be null here, but record_activity handles it (it sets user_id to null).
+        record_activity('LOGIN_FAILED', "Gagal login dengan email '{$email}'. Kemungkinan password salah atau akun diblokir.");
+    }
+});

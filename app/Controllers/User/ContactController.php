@@ -112,6 +112,7 @@ class ContactController extends BaseController
         if (($handle = fopen($file->getTempName(), "r")) !== FALSE) {
             $header = fgetcsv($handle, 1000, ","); // Skip header
             
+            $db->transStart();
             while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
                 if (empty($data[0])) continue;
 
@@ -120,15 +121,22 @@ class ContactController extends BaseController
 
                 // Insert ignore logic
                 try {
-                    $model->insert([
-                        'user_id' => auth()->id(),
-                        'email'   => $email,
-                        'name'    => $name
-                    ]);
-                    $contactId = $model->insertID();
+                    // Check if exists first to avoid exception overhead if possible, or just let it fail
+                    $existing = $model->where('email', $email)->where('user_id', auth()->id())->first();
+                    
+                    if (!$existing) {
+                        $model->insert([
+                            'user_id' => auth()->id(),
+                            'email'   => $email,
+                            'name'    => $name
+                        ]);
+                        $contactId = $model->insertID();
+                    } else {
+                        $contactId = $existing['id'];
+                    }
 
                     if ($tagId) {
-                        $db->table('recipient_tags')->insert([
+                        $db->table('recipient_tags')->ignore(true)->insert([
                             'contact_id' => $contactId,
                             'tag_id'     => $tagId
                         ]);
@@ -136,9 +144,10 @@ class ContactController extends BaseController
                     }
                     $count++;
                 } catch (\Exception $e) {
-                    // Skip jika sudah ada
+                    // Skip jika error tak terduga
                 }
             }
+            $db->transComplete();
             fclose($handle);
         }
 
@@ -171,6 +180,8 @@ class ContactController extends BaseController
                 'tag_id'     => $tagId
             ]);
         }
+        
+        record_activity('UPDATE_CONTACT', "Memperbarui kontak '{$email}' ({$name}).", ['contact_id' => $id]);
 
         return redirect()->back()->with('success', 'Kontak berhasil diperbarui.');
     }
@@ -180,8 +191,12 @@ class ContactController extends BaseController
         $model = new ContactModel();
         $db = \Config\Database::connect();
 
+        $contact = $model->where(['id' => $id, 'user_id' => auth()->id()])->first();
+        if (!$contact) return redirect()->back()->with('error', 'Kontak tidak ditemukan.');
+
         if ($model->where(['id' => $id, 'user_id' => auth()->id()])->delete()) {
             $db->table('recipient_tags')->where('contact_id', $id)->delete();
+            record_activity('DELETE_CONTACT', "Menghapus kontak '{$contact['email']}'.", ['contact_id' => $id]);
             return redirect()->back()->with('success', 'Kontak berhasil dihapus.');
         }
 
