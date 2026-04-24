@@ -22,26 +22,36 @@ class CampaignController extends BaseController
             ->orderBy('campaigns.updated_at', 'DESC')
             ->get()->getResultArray();
 
-        // Hitung statistik dari tabel email_queue
-        foreach ($campaigns as &$c) {
-            $c['total_sent']   = $db->table('email_queue')->where(['campaign_id' => $c['id'], 'status' => 'SENT'])->countAllResults();
-            $c['total_failed'] = $db->table('email_queue')->where(['campaign_id' => $c['id'], 'status' => 'FAILED'])->countAllResults();
-            
-            // --- KUNCI OPTIMASI: Hitung total target ASLI langsung dari jumlah antreannya ---
-            $real_total = $db->table('email_queue')->where('campaign_id', $c['id'])->countAllResults();
-            
-            // Timpa nilai total_targets agar tampilan UI juga jujur
-            $c['total_targets'] = $real_total;
-            
-            // Hindari error pembagian dengan nol (Division by Zero)
-            $total_divisor = $real_total > 0 ? $real_total : 1; 
-            
-            // Kalkulasi Persentase
-            $c['progress_percent'] = round((($c['total_sent'] + $c['total_failed']) / $total_divisor) * 100);
-            
-            // Opsional: Cegah persentase tembus lebih dari 100% (Safety Net)
-            if ($c['progress_percent'] > 100) $c['progress_percent'] = 100;
+        // FIX #6: Single aggregate query menggantikan N+1 (4 query per baris kampanye)
+        // Sebelumnya: 50 kampanye = 200+ extra queries. Sekarang: 1 query total.
+        $statsRaw = $db->query("
+            SELECT
+                campaign_id,
+                COUNT(*) AS total_targets,
+                SUM(status = 'SENT') AS total_sent,
+                SUM(status = 'FAILED') AS total_failed,
+                SUM(status IN ('PENDING','PROCESSING')) AS total_pending
+            FROM email_queue
+            GROUP BY campaign_id
+        ")->getResultArray();
+
+        // Buat lookup array berdasarkan campaign_id untuk akses O(1)
+        $stats = [];
+        foreach ($statsRaw as $s) {
+            $stats[$s['campaign_id']] = $s;
         }
+
+        foreach ($campaigns as &$c) {
+            $s = $stats[$c['id']] ?? ['total_targets' => 0, 'total_sent' => 0, 'total_failed' => 0, 'total_pending' => 0];
+
+            $c['total_targets'] = (int) $s['total_targets'];
+            $c['total_sent']    = (int) $s['total_sent'];
+            $c['total_failed']  = (int) $s['total_failed'];
+
+            $divisor = $c['total_targets'] > 0 ? $c['total_targets'] : 1;
+            $c['progress_percent'] = min(100, round((($c['total_sent'] + $c['total_failed']) / $divisor) * 100));
+        }
+        unset($c); // Putuskan referensi setelah loop
 
         $data = [
             'pageTitle'  => 'Manajemen Kampanye',
@@ -155,7 +165,12 @@ class CampaignController extends BaseController
         }
         
         $campaign = $builder->get()->getRowArray();
-        
+
+        // FIX #9: Guard null agar tidak PHP Fatal Error saat akses array pada null
+        if (! $campaign) {
+            return redirect()->back()->with('error', 'Akses ditolak: Kampanye tidak ditemukan atau bukan milik Anda.');
+        }
+
         if ($campaign['status'] === 'RUNNING') {
             return redirect()->back()->with('error', 'Kampanye yang sedang berjalan tidak bisa dihapus. Silakan hentikan (Pause/Cancel) terlebih dahulu.');
         }

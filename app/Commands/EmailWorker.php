@@ -25,6 +25,15 @@ class EmailWorker extends BaseCommand
         while (true) {
             $db->reconnect();
 
+            // 🔥 FIX #2: Recovery — Kembalikan email yang stuck di PROCESSING > 5 menit
+            // Ini mencegah data mati jika worker crash/di-kill paksa
+            $db->query("
+                UPDATE email_queue
+                SET status = 'PENDING', updated_at = NOW()
+                WHERE status = 'PROCESSING'
+                AND updated_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+            ");
+
             // --- PROSES OTOMASI (SEQUENCES) ---
             $this->processAutomations($db);
 
@@ -303,31 +312,68 @@ class EmailWorker extends BaseCommand
     private function processAutomations($db)
     {
         $now = date('Y-m-d H:i:s');
-        
-        $queueItems = $db->table('automation_queue')
-            ->where('next_run_at <=', $now)
-            ->where('status', 'PENDING')
-            ->get()->getResultArray();
 
-        foreach ($queueItems as $item) {
-            $step = $db->table('automation_steps')->where('id', $item['current_step_id'])->get()->getRowArray();
-            $contact = $db->table('contacts')->where('id', $item['recipient_id'])->get()->getRowArray();
-            $automation = $db->table('automations')->where('id', $item['automation_id'])->get()->getRowArray();
+        // 🔥 FIX #1: Gunakan ATOMIC LOCK agar tidak ada double-send saat multi-worker
+        $db->transStart();
+        $items = $db->query("
+            SELECT *
+            FROM automation_queue
+            WHERE status = 'PENDING'
+            AND next_run_at <= NOW()
+            ORDER BY id ASC
+            LIMIT 5
+            FOR UPDATE SKIP LOCKED
+        ")->getResultArray();
 
-            if ($step && $contact && $automation['status'] == 'ACTIVE') {
+        if (empty($items)) {
+            $db->transComplete();
+            return;
+        }
+
+        // Kunci status semua item yang diambil sebelum transComplete
+        $ids = array_column($items, 'id');
+        $db->table('automation_queue')->whereIn('id', $ids)->update(['status' => 'PROCESSING']);
+        $db->transComplete();
+
+        foreach ($items as $item) {
+            try {
+                $step       = $db->table('automation_steps')->where('id', $item['current_step_id'])->get()->getRowArray();
+                $automation = $db->table('automations')->where('id', $item['automation_id'])->get()->getRowArray();
+
+                // FIX #10: Gunakan contact_id (konsisten dengan tabel contacts)
+                $contactId = $item['contact_id'] ?? $item['recipient_id'];
+                $contact   = $db->table('contacts')->where('id', $contactId)->get()->getRowArray();
+
+                if (! $step || ! $contact || ! $automation || $automation['status'] !== 'ACTIVE') {
+                    $db->table('automation_queue')->where('id', $item['id'])->update([
+                        'status' => 'FAILED',
+                    ]);
+                    continue;
+                }
+
+                // FIX #8: Gunakan subject dari template, bukan name-nya
                 $template = $db->table('templates')->where('id', $step['template_id'])->get()->getRowArray();
-                
+
+                if (! $template) {
+                    $db->table('automation_queue')->where('id', $item['id'])->update(['status' => 'FAILED']);
+                    continue;
+                }
+
+                // Ganti merge tags sebelum dimasukkan ke queue
+                $body    = str_replace(['{{name}}', '{{email}}'], [$contact['name'], $contact['email']], $template['content']);
+                $subject = $template['subject'] ?? $template['name']; // Fallback ke name jika subject belum diisi
+
                 $db->table('email_queue')->insert([
                     'campaign_id'       => 0,
-                    'recipient_id'      => $contact['id'],
-                    'sender_account_id' => $automation['sender_account_id'] ?? 0, // Pastikan ada sender_id
+                    'recipient_id'      => $contactId,
+                    'sender_account_id' => $automation['sender_account_id'] ?? 0,
                     'to_email'          => $contact['email'],
-                    'subject'           => $template['name'],
-                    'body'              => $template['content'],
+                    'subject'           => $subject,
+                    'body'              => $body,
                     'status'            => 'PENDING',
                     'scheduled_at'      => $now,
                     'created_at'        => $now,
-                    'updated_at'        => $now
+                    'updated_at'        => $now,
                 ]);
 
                 $nextStep = $db->table('automation_steps')
@@ -340,11 +386,15 @@ class EmailWorker extends BaseCommand
                     $db->table('automation_queue')->where('id', $item['id'])->update([
                         'current_step_id' => $nextStep['id'],
                         'next_run_at'     => date('Y-m-d H:i:s', strtotime("+{$nextStep['delay_days']} days")),
-                        'status'          => 'PENDING'
+                        'status'          => 'PENDING',
                     ]);
                 } else {
                     $db->table('automation_queue')->where('id', $item['id'])->update(['status' => 'COMPLETED']);
                 }
+
+            } catch (\Exception $e) {
+                log_message('error', '[Automation] Error processing item ID ' . $item['id'] . ': ' . $e->getMessage());
+                $db->table('automation_queue')->where('id', $item['id'])->update(['status' => 'PENDING']);
             }
         }
     }
