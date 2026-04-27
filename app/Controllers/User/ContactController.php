@@ -81,7 +81,7 @@ class ContactController extends BaseController
             ]);
         }
 
-        return redirect()->back()->with('success', 'Tag berhasil dibuat.');
+        return redirect()->to(url_to('user.contacts') . '#tab-segments')->with('success', 'Tag berhasil dibuat.');
     }
 
     public function downloadSample()
@@ -134,7 +134,7 @@ class ContactController extends BaseController
                         ]);
                         $contactId = $model->insertID();
                     } else {
-                        $contactId = $existing['id'];
+                        $contactId = $existing->id;
                     }
 
                     if ($tagId) {
@@ -202,7 +202,7 @@ class ContactController extends BaseController
 
         if ($model->where(['id' => $id, 'user_id' => auth()->id()])->delete()) {
             $db->table('recipient_tags')->where('contact_id', $id)->delete();
-            record_activity('DELETE_CONTACT', "Menghapus kontak '{$contact['email']}'.", ['contact_id' => $id]);
+            record_activity('DELETE_CONTACT', "Menghapus kontak '{$contact->email}'.", ['contact_id' => $id]);
             return redirect()->back()->with('success', 'Kontak berhasil dihapus.');
         }
 
@@ -215,7 +215,7 @@ class ContactController extends BaseController
         $db->table('tags')->where(['id' => $id, 'user_id' => auth()->id()])->delete();
         $db->table('recipient_tags')->where('tag_id', $id)->delete();
 
-        return redirect()->back()->with('success', 'Tag berhasil dihapus.');
+        return redirect()->to(url_to('user.contacts') . '#tab-segments')->with('success', 'Tag berhasil dihapus.');
     }
 
     public function updateTag($id)

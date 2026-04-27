@@ -85,7 +85,7 @@
                                 <a href="<?= url_to('app.campaigns.wizard', 3) ?>" class="btn btn-sm btn-ghost-secondary">Edit Desain</a>
                             </div>
                             <div class="preview-frame border rounded bg-white shadow-inset" style="height: 350px; overflow: hidden;">
-                                <iframe id="mail-preview" style="width: 100%; height: 100%; border: none;"></iframe>
+                                <iframe id="mail-preview" style="width: 100%; height: 100%; border: none; background-color: white; color-scheme: light;"></iframe>
                             </div>
                         </div>
                     </div>

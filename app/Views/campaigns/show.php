@@ -202,6 +202,7 @@
                     <tr>
                         <th>Alamat Email</th>
                         <th>Status</th>
+                        <th class="text-center">Interaksi</th>
                         <th class="text-center">Percobaan</th>
                         <th class="text-center">Keterangan / Error</th>
                         <th>Waktu</th>
@@ -230,6 +231,31 @@
                             <?php endif; ?>
                         </td>
                         <td class="text-center">
+                            <?php if ($row['opens_count'] > 0 || $row['clicks_count'] > 0): ?>
+                                <div class="d-flex flex-column align-items-center">
+                                    <div class="mb-1">
+                                        <?php if ($row['opens_count'] > 0): ?>
+                                            <span class="badge bg-info-lt" title="Total Dibuka">
+                                                <i class="ti ti-eye me-1"></i> <?= $row['opens_count'] ?>x
+                                            </span>
+                                        <?php endif; ?>
+                                        <?php if ($row['clicks_count'] > 0): ?>
+                                            <span class="badge bg-purple-lt ms-1" title="Total Diklik">
+                                                <i class="ti ti-link me-1"></i> <?= $row['clicks_count'] ?>x
+                                            </span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <?php if ($row['last_track']): ?>
+                                        <small class="text-muted" style="font-size: 0.7rem;">
+                                            Last: <?= date('H:i', strtotime($row['last_track'])) ?>
+                                        </small>
+                                    <?php endif; ?>
+                                </div>
+                            <?php else: ?>
+                                <span class="text-muted small">-</span>
+                            <?php endif; ?>
+                        </td>
+                        <td class="text-center">
                             <span class="badge badge-outline text-muted"><?= $row['attempt'] ?>/3</span>
                         </td>
                         <td class="text-center">
@@ -240,7 +266,7 @@
                             </button>
                         </td>
                         <td class="small text-muted">
-                            <?= date('d/m H:i', strtotime($row['updated_at'])) ?>
+                            <?= date('d/m/Y H:i:s', strtotime($row['updated_at'])) ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>
@@ -267,7 +293,7 @@
                     <div class="small text-muted"><strong>From:</strong> <?= esc($campaign['sender_name']) ?> &lt;<?= esc($campaign['sender_email']) ?>&gt;</div>
                 </div>
                 <div class="p-0" style="height: 600px;">
-                    <iframe id="email-preview-frame" style="width: 100%; height: 100%; border: none;"></iframe>
+                    <iframe id="email-preview-frame" style="width: 100%; height: 100%; border: none; background-color: white; color-scheme: light;"></iframe>
                 </div>
             </div>
             <div class="modal-footer">

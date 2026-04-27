@@ -38,7 +38,7 @@
                         <div class="text-muted small">Disimpan: <?= date('d M Y', strtotime($t->created_at)) ?></div>
                     </div>
                 </div>
-                <div class="border rounded bg-light p-0 position-relative" style="height: 180px; overflow: hidden;">
+                <div class="border rounded p-0 position-relative" style="height: 180px; overflow: hidden; background-color: white; color-scheme: light;">
                     <div class="p-3" style="transform: scale(0.4); transform-origin: top left; width: 250%;">
                         <?= $t->content ?>
                     </div>
@@ -78,7 +78,7 @@
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body p-0">
-                <iframe id="preview-frame" style="width: 100%; height: 600px; border: none;"></iframe>
+                <iframe id="preview-frame" style="width: 100%; height: 600px; border: none; background-color: white; color-scheme: light;"></iframe>
             </div>
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Tutup</button>

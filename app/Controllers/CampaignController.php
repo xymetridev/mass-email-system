@@ -242,9 +242,13 @@ class CampaignController extends BaseController
         $perPage = 50; // Tampilkan 50 antrean per halaman
         $offset  = ($page - 1) * $perPage;
 
-        $recipients = $db->table('email_queue')
-            ->where('campaign_id', $id)
-            ->orderBy('id', 'ASC')
+        $recipients = $db->table('email_queue q')
+            ->select('q.*, 
+                (SELECT COUNT(*) FROM tracking_logs WHERE email_queue_id = q.id AND event_type = "OPEN") as opens_count,
+                (SELECT COUNT(*) FROM tracking_logs WHERE email_queue_id = q.id AND event_type = "CLICK") as clicks_count,
+                (SELECT MAX(created_at) FROM tracking_logs WHERE email_queue_id = q.id) as last_track')
+            ->where('q.campaign_id', $id)
+            ->orderBy('q.id', 'ASC')
             ->limit($perPage, $offset)
             ->get()->getResultArray();
 
