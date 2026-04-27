@@ -1,5 +1,5 @@
 <div class="table-responsive" style="min-height: 250px;">
-        <table class="table table-vcenter table-mobile-md card-table">
+        <table class="table table-vcenter text-nowrap card-table">
             <thead>
                 <tr>
                     <th>Nama Kampanye</th>

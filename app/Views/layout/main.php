@@ -173,18 +173,27 @@
 
         document.addEventListener("DOMContentLoaded", function() {
             const key = 'mes-theme';
-            const button = document.getElementById('theme-toggle');
-            if (!button) return;
-
+            const buttons = document.querySelectorAll('.theme-toggle');
+            
             const applyTheme = (theme) => {
                 document.documentElement.setAttribute('data-bs-theme', theme);
                 localStorage.setItem(key, theme);
-                button.innerHTML = theme === 'dark' ? '<i class="ti ti-sun"></i>' : '<i class="ti ti-moon"></i>';
+                buttons.forEach(btn => {
+                    btn.innerHTML = theme === 'dark' ? '<i class="ti ti-sun"></i>' : '<i class="ti ti-moon"></i>';
+                });
             };
 
-            button.addEventListener('click', () => {
-                const current = document.documentElement.getAttribute('data-bs-theme');
-                applyTheme(current === 'dark' ? 'light' : 'dark');
+            buttons.forEach(button => {
+                button.addEventListener('click', () => {
+                    const current = document.documentElement.getAttribute('data-bs-theme');
+                    applyTheme(current === 'dark' ? 'light' : 'dark');
+                });
+            });
+
+            // Set initial button state
+            const currentTheme = document.documentElement.getAttribute('data-bs-theme');
+            buttons.forEach(btn => {
+                btn.innerHTML = currentTheme === 'dark' ? '<i class="ti ti-sun"></i>' : '<i class="ti ti-moon"></i>';
             });
         });
     </script>

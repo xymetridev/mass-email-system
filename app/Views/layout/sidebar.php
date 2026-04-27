@@ -17,6 +17,41 @@ $isAdmin = auth()->user()?->inGroup('admin');
 
 <aside class="navbar navbar-vertical navbar-expand-lg">
     <div class="container-fluid">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+        <h1 class="navbar-brand navbar-brand-autodark">
+            <a href="<?= site_url('/') ?>" class="d-flex align-items-center gap-2 text-decoration-none">
+                <i class="ti ti-mail-fast text-primary" style="font-size: 1.5rem;"></i>
+                <span class="navbar-brand-text">Mass Email</span>
+            </a>
+        </h1>
+        <div class="navbar-nav flex-row d-lg-none">
+            <div class="nav-item me-2">
+                <button class="theme-toggle btn btn-icon btn-ghost-secondary shadow-none border-0" type="button" title="Ganti Tema">
+                    <i class="ti ti-moon"></i>
+                </button>
+            </div>
+            <div class="nav-item dropdown">
+                <a href="#" class="nav-link d-flex lh-1 text-reset p-0" data-bs-toggle="dropdown">
+                    <span class="avatar avatar-sm bg-primary-lt shadow-sm">
+                        <?= strtoupper(substr((string) auth()->user()->username, 0, 1)) ?>
+                    </span>
+                </a>
+                <div class="dropdown-menu dropdown-menu-end dropdown-menu-arrow">
+                    <a href="<?= url_to('app.profile') ?>" class="dropdown-item">
+                        <i class="ti ti-user me-2 text-muted"></i> Profil Saya
+                    </a>
+                    <div class="dropdown-divider"></div>
+                    <form action="<?= url_to('logout') ?>" method="post">
+                        <?= csrf_field() ?>
+                        <button type="submit" class="dropdown-item text-danger">
+                            <i class="ti ti-logout me-2"></i> Logout
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
         <div class="collapse navbar-collapse" id="sidebar-menu">
             <ul class="navbar-nav pt-lg-3">
                 

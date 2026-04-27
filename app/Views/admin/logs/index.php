@@ -59,7 +59,7 @@ function parseUserAgentStr($ua) {
         <!-- TAB 1: AKTIVITAS PENGGUNA -->
         <div class="tab-pane fade show active" id="tab-activity">
             <div class="table-responsive">
-                <table class="table table-vcenter table-mobile-md card-table">
+                <table class="table table-vcenter text-nowrap card-table">
                     <thead>
                         <tr>
                             <th class="ps-4">Waktu</th>
@@ -98,14 +98,9 @@ function parseUserAgentStr($ua) {
                                 </span>
                             </td>
                             <td>
-                                <div class="text-dark small mb-1" style="max-width: 300px; white-space: normal;">
+                                <div class="small mb-1">
                                     <?= esc($log['description']) ?>
                                 </div>
-                                <?php if(!empty($log['context'])): ?>
-                                    <button class="btn btn-sm btn-light py-0 px-2 text-muted" onclick='showContext(<?= json_encode($log['context']) ?>)'>
-                                        <i class="ti ti-code me-1"></i> Lihat Data
-                                    </button>
-                                <?php endif; ?>
                             </td>
                             <td class="text-muted small">
                                 <div><i class="ti ti-world me-1"></i> <?= esc($log['ip_address']) ?></div>

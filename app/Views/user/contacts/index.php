@@ -41,7 +41,7 @@
         <!-- TAB 1: DAFTAR KONTAK -->
         <div class="tab-pane fade show active" id="tab-contacts" role="tabpanel">
             <div class="table-responsive">
-                <table class="table table-vcenter table-mobile-md card-table">
+                <table class="table table-vcenter text-nowrap card-table">
                     <thead>
                         <tr>
                             <th class="ps-4">Informasi Kontak</th>

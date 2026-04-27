@@ -266,7 +266,7 @@
                             </button>
                         </td>
                         <td class="small text-muted">
-                            <?= date('d/m/Y H:i:s', strtotime($row['updated_at'])) ?>
+                            <?= date('d M Y H:i:s', strtotime($row['updated_at'])) ?>
                         </td>
                     </tr>
                     <?php endforeach; ?>

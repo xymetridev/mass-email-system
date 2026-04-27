@@ -1,11 +1,11 @@
 <header class="navbar navbar-expand-md d-none d-lg-flex d-print-none border-bottom">
     <div class="container-xl">
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbar-menu">
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#sidebar-menu">
             <span class="navbar-toggler-icon"></span>
         </button>
         <div class="navbar-nav flex-row order-md-last ms-auto">
             <div class="nav-item d-none d-md-flex me-3">
-                <button id="theme-toggle" class="btn btn-icon btn-ghost-secondary shadow-none border-0" type="button" title="Ganti Tema">
+                <button class="theme-toggle btn btn-icon btn-ghost-secondary shadow-none border-0" type="button" title="Ganti Tema">
                     <i id="theme-icon" class="ti ti-moon"></i>
                 </button>
             </div>
