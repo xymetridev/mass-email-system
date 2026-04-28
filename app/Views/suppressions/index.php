@@ -96,10 +96,18 @@
                             <?= date('d M Y, H:i', strtotime($row['created_at'])) ?>
                         </td>
                         <td class="text-end">
-                            <form action="<?= url_to('app.suppressions.delete', $row['id']) ?>" method="post" class="d-inline" onsubmit="return confirm('Apakah Anda yakin ingin memutihkan (whitelist) email ini? Sistem akan bisa mengirim email kembali ke alamat ini.');">
+                            <form action="<?= url_to('app.suppressions.delete', $row['id']) ?>" method="post" class="d-inline" id="form-whitelist-<?= $row['id'] ?>">
                                 <?= csrf_field() ?>
                                 <input type="hidden" name="_method" value="DELETE">
-                                <button type="submit" class="btn btn-sm btn-outline-success btn-pill" title="Putihkan Email (Whitelist)">
+                                <button type="button" class="btn btn-sm btn-outline-success btn-pill" 
+                                        onclick="confirmAction({
+                                            title: 'Whitelist Email?',
+                                            text: 'Sistem akan bisa mengirim email kembali ke alamat <?= esc($row['email'], 'js') ?>.',
+                                            type: 'success',
+                                            confirmText: 'Ya, Putihkan',
+                                            onConfirm: () => document.getElementById('form-whitelist-<?= $row['id'] ?>').submit()
+                                        })"
+                                        title="Putihkan Email (Whitelist)">
                                     <i class="ti ti-shield-check me-1"></i> Whitelist
                                 </button>
                             </form>
