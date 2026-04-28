@@ -101,7 +101,8 @@ class TrackingController extends Controller
         }
 
         // Verifikasi HMAC token agar tidak bisa disalahgunakan
-        $expectedToken = hash_hmac('sha256', $queueId . '|' . $queue['to_email'], env('app.key'));
+        $secretKey = env('encryption.key') ?? config('App')->baseURL;
+        $expectedToken = hash_hmac('sha256', $queueId . '|' . $queue['to_email'], $secretKey);
         if (! hash_equals($expectedToken, $token ?? '')) {
             return view('user/unsubscribe_success', ['email' => $queue['to_email'], 'error' => 'Token tidak valid.']);
         }

@@ -30,8 +30,8 @@ class LogController extends BaseController
         // Sanitasi: cegah path traversal (../../../etc/passwd)
         $fileName = basename($fileName);
 
-        // Hanya izinkan file dengan ekstensi .log
-        if (!preg_match('/^log-\d{4}-\d{2}-\d{2}\.log$/', $fileName)) {
+        // Hanya izinkan file log harian atau file log worker
+        if (!preg_match('/^(log-\d{4}-\d{2}-\d{2}|worker\.(out|err))\.log$/', $fileName)) {
             return $this->response->setJSON(['status' => 'error', 'message' => 'Nama file tidak valid.']);
         }
 

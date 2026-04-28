@@ -17,11 +17,18 @@ class EmailWorker extends BaseCommand
     public function run(array $params)
     {
         set_time_limit(0);
+
+        // 🪵 LOG ROTATION: Cek jika worker.out.log > 5MB, reset biar tidak bengkak
+        $logFile = WRITEPATH . 'logs/worker.out.log';
+        if (file_exists($logFile) && filesize($logFile) > 5 * 1024 * 1024) {
+            file_put_contents($logFile, "[" . date('Y-m-d H:i:s') . "] Log reset karena ukuran > 5MB.\n");
+        }
+
         $db = db_connect();
         $emailService = \Config\Services::email(null, false);
-        $this->encrypter = service('encrypter'); // Inisialisasi sekali di luar loop
+        $this->encrypter = service('encrypter'); 
         
-        CLI::write("Worker sedang berjalan... Tekan CTRL+C untuk stop.", 'green');
+        $this->logActivity("Worker started. Monitoring queue...", 'green');
 
         while (true) {
             $db->reconnect();
@@ -61,7 +68,6 @@ class EmailWorker extends BaseCommand
 
             if (!$email) {
                 $db->transComplete();
-                CLI::print("Antrean kosong, istirahat 5 detik...\r");
                 sleep(5);
                 continue;
             }
@@ -76,13 +82,13 @@ class EmailWorker extends BaseCommand
                     'updated_at' => date('Y-m-d H:i:s')
                 ]);
                 $db->transComplete();
-                CLI::write("SKIPPED (Blacklisted): " . $email->to_email, 'yellow');
+                $this->logActivity("SKIPPED (Blacklisted): " . $email->to_email, 'yellow');
                 continue;
             }
 
             $sender = $db->table('sender_accounts')->where('id', $email->sender_account_id)->get()->getRow();
             if (!$sender) {
-                CLI::write("SKIPPED: Sender account $email->sender_account_id tidak ditemukan.", 'red');
+                $this->logActivity("SKIPPED: Sender account $email->sender_account_id tidak ditemukan.", 'red');
                 $db->table('email_queue')->where('id', $email->id)->update(['status' => 'FAILED', 'last_error' => 'Sender account missing', 'updated_at' => date('Y-m-d H:i:s')]);
                 $db->transComplete();
                 continue;
@@ -120,7 +126,7 @@ class EmailWorker extends BaseCommand
 
             // Cek Limit Harian (Warm-up)
             if ($sender->warmup_mode && $sender->warmup_sent_today >= $sender->warmup_daily_limit) {
-                CLI::write("Limit harian tercapai untuk {$sender->sender_email}. Skipping...", 'yellow');
+                $this->logActivity("Limit harian tercapai untuk {$sender->sender_email}. Skipping...", 'yellow');
                 $db->table('email_queue')->where('id', $email->id)->update(['status' => 'PENDING']);
                 $db->transComplete();
                 continue;
@@ -128,7 +134,7 @@ class EmailWorker extends BaseCommand
 
             // Cek Limit Per Jam (Throttling)
             if ($sender->hourly_limit > 0 && $sender->sent_this_hour >= $sender->hourly_limit) {
-                CLI::write("Limit per jam tercapai untuk {$sender->sender_email}. Menunggu jam berikutnya...", 'yellow');
+                $this->logActivity("Limit per jam tercapai untuk {$sender->sender_email}. Menunggu jam berikutnya...", 'yellow');
                 $db->table('email_queue')->where('id', $email->id)->update(['status' => 'PENDING']);
                 $db->transComplete();
                 continue;
@@ -156,7 +162,8 @@ class EmailWorker extends BaseCommand
                 $body = $email->body;
 
                 // Replace merge tag {{unsubscribe_url}} if user put it manually
-                $token = hash_hmac('sha256', $email->id . '|' . $email->to_email, env('app.key'));
+                $secretKey = env('encryption.key') ?? config('App')->baseURL;
+                $token = hash_hmac('sha256', $email->id . '|' . $email->to_email, $secretKey);
                 $unsubUrl = site_url('track/unsubscribe/' . $email->id . '?token=' . $token);
                 $body = str_ireplace('{{unsubscribe_url}}', $unsubUrl, $body);
 
@@ -170,7 +177,14 @@ class EmailWorker extends BaseCommand
 
                 // Injeksi Tracking Pixel (Open Tracking)
                 $pixelUrl = site_url('track/open/' . $email->id);
-                $body .= '<img src="'.$pixelUrl.'" width="1" height="1" alt="" style="display:none;" />';
+                $pixelImg = '<img src="'.$pixelUrl.'" width="1" height="1" alt="" style="display:none;" />';
+                
+                // Pasang pixel sebelum penutup body agar tidak mudah terpotong
+                if (stripos($body, '</body>') !== false) {
+                    $body = str_ireplace('</body>', $pixelImg . '</body>', $body);
+                } else {
+                    $body .= $pixelImg;
+                }
 
                 // Wrap semua link <a href="..."> untuk Click Tracking
                 $body = preg_replace_callback('/<a\s+(?:[^>]*?\s+)?href=([\'"])(.*?)\1/', function($matches) use ($email) {
@@ -199,10 +213,10 @@ class EmailWorker extends BaseCommand
                        ->set('sent_this_hour', 'sent_this_hour + 1', false)
                        ->update();
 
-                    CLI::write("Sukses: " . $email->to_email, 'green');
+                    $this->logActivity("Sukses: " . $email->to_email, 'green');
                 } else {
                     $this->markAsFailed($db, $email, $emailService->printDebugger(['headers', 'subject', 'body']), $sender);
-                    CLI::write("Gagal: " . $email->to_email, 'red');
+                    $this->logActivity("Gagal: " . $email->to_email, 'red');
 
                     $debug = $emailService->printDebugger(['headers', 'subject']);
                     log_message('error', 'SMTP send failed for {to}. Debug: {debug}', [
@@ -228,13 +242,26 @@ class EmailWorker extends BaseCommand
     }
 
     private function getSmtpConfig($sender) {
+        $port = (int)$sender->smtp_port;
+        $encryption = strtolower(trim($sender->encryption));
+        $crypto = '';
+
+        // Smart logic untuk mencegah error 503 STARTTLS
+        if ($port === 465) {
+            $crypto = 'ssl'; // Port 465 selalu SSL (Implicit)
+        } elseif ($port === 587) {
+            $crypto = 'tls'; // Port 587 standar TLS (Explicit)
+        } elseif ($encryption !== 'none') {
+            $crypto = $encryption; // Fallback ke DB jika port non-standar
+        }
+
         return [
             'protocol'   => 'smtp',
-            'SMTPHost'   => $sender->smtp_host,
-            'SMTPUser'   => $sender->smtp_username,
+            'SMTPHost'   => trim($sender->smtp_host),
+            'SMTPUser'   => trim($sender->smtp_username),
             'SMTPPass'   => $this->encrypter->decrypt(base64_decode($sender->smtp_password)),
-            'SMTPPort'   => (int)$sender->smtp_port,
-            'SMTPCrypto' => ($sender->encryption === 'None') ? '' : strtolower($sender->encryption),
+            'SMTPPort'   => $port,
+            'SMTPCrypto' => $crypto,
             'mailType'   => 'html',
             'charset'    => 'utf-8',
             'newline'    => "\r\n",
@@ -276,7 +303,7 @@ class EmailWorker extends BaseCommand
 
             if ($remaining === 0) {
                 $db->table('campaigns')->where('id', $email->campaign_id)->update(['status' => 'COMPLETED']);
-                CLI::write("INFO: Kampanye ID {$email->campaign_id} SELESAI!", 'blue');
+                $this->logActivity("INFO: Kampanye ID {$email->campaign_id} SELESAI!", 'blue');
             }
         }
     }
@@ -446,7 +473,16 @@ class EmailWorker extends BaseCommand
                ->where('id', $campaign->id)
                ->update(['status' => 'RUNNING', 'updated_at' => $now]);
 
-            CLI::write("SCHEDULER: Kampanye [{$campaign->name}] telah DIAKTIFKAN!", 'green');
+            $this->logActivity("SCHEDULER: Kampanye [{$campaign->name}] telah DIAKTIFKAN!", 'green');
         }
+    }
+
+    /**
+     * Helper untuk logging dengan timestamp agar rapi dan informatif.
+     */
+    private function logActivity($message, $color = 'white')
+    {
+        $timestamp = date('Y-m-d H:i:s');
+        CLI::write("[$timestamp] $message", $color);
     }
 }

@@ -172,7 +172,8 @@
             <?php endif; ?>
         </div>
         <div class="card-body">
-            <?php if ($campaign['scheduled_at']): ?>
+            <?php if ($campaign['status'] === 'SCHEDULED'): ?>
+                <!-- STATUS: DIJADWALKAN -->
                 <div class="d-flex align-items-center">
                     <div class="avatar avatar-md bg-orange-lt me-3"><i class="ti ti-clock fs-2"></i></div>
                     <div>
@@ -180,14 +181,56 @@
                         <div class="h3 mb-0"><?= date('d F Y, H:i', strtotime($campaign['scheduled_at'])) ?></div>
                     </div>
                 </div>
-            <?php else: ?>
+            <?php elseif ($campaign['status'] === 'RUNNING'): ?>
+                <!-- STATUS: SEDANG JALAN -->
                 <div class="d-flex align-items-center">
-                    <div class="avatar avatar-md bg-secondary-lt me-3"><i class="ti ti-player-play fs-2"></i></div>
+                    <div class="avatar avatar-md bg-success-lt me-3">
+                        <i class="ti ti-send fs-2"></i>
+                    </div>
                     <div>
-                        <div class="h3 mb-0">Langsung Kirim (Now)</div>
-                        <div class="text-muted small">Kampanye akan dieksekusi segera setelah dijalankan.</div>
+                        <div class="text-success small fw-bold">Sedang Berjalan:</div>
+                        <div class="h3 mb-0">Worker sedang memproses antrean email...</div>
                     </div>
                 </div>
+            <?php elseif ($campaign['status'] === 'COMPLETED'): ?>
+                <!-- STATUS: SELESAI -->
+                <div class="d-flex align-items-center">
+                    <div class="avatar avatar-md bg-blue-lt me-3"><i class="ti ti-circle-check fs-2"></i></div>
+                    <div>
+                        <div class="text-muted small">Status Pengiriman:</div>
+                        <div class="h3 mb-0 text-blue">Selesai Dikirim</div>
+                        <div class="small text-muted">Tuntas pada <?= date('d M Y, H:i', strtotime($campaign['updated_at'])) ?></div>
+                    </div>
+                </div>
+            <?php elseif ($campaign['status'] === 'PAUSED'): ?>
+                <!-- STATUS: DIPENDING / PAUSED -->
+                <div class="d-flex align-items-center">
+                    <div class="avatar avatar-md bg-warning-lt me-3"><i class="ti ti-player-pause fs-2"></i></div>
+                    <div>
+                        <div class="text-warning small fw-bold">Pengiriman Ditunda:</div>
+                        <div class="h3 mb-0">Antrean dihentikan sementara.</div>
+                    </div>
+                </div>
+            <?php else: ?>
+                <!-- STATUS: DRAFT / LAINNYA -->
+                <?php if ($campaign['scheduled_at']): ?>
+                    <div class="d-flex align-items-center">
+                        <div class="avatar avatar-md bg-secondary-lt me-3"><i class="ti ti-calendar-time fs-2"></i></div>
+                        <div>
+                            <div class="text-muted small">Target Jadwal:</div>
+                            <div class="h3 mb-0 text-muted"><?= date('d F Y, H:i', strtotime($campaign['scheduled_at'])) ?></div>
+                            <div class="small text-muted">Status: <?= $campaign['status'] ?></div>
+                        </div>
+                    </div>
+                <?php else: ?>
+                    <div class="d-flex align-items-center">
+                        <div class="avatar avatar-md bg-secondary-lt me-3"><i class="ti ti-player-play fs-2"></i></div>
+                        <div>
+                            <div class="h3 mb-0">Langsung Kirim (Manual)</div>
+                            <div class="text-muted small">Eksekusi segera setelah kampanye dijalankan.</div>
+                        </div>
+                    </div>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
     </div>
