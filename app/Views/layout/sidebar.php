@@ -99,6 +99,13 @@ $isAdmin = auth()->user()?->inGroup('admin');
                     </a>
                 </li>
 
+                <li class="nav-item <?= ($activeMenu == 'suppressions') ? 'active' : '' ?>">
+                    <a class="nav-link" href="<?= url_to('app.suppressions') ?>">
+                        <span class="nav-link-icon"><i class="ti ti-shield-off"></i></span>
+                        <span class="nav-link-title">Blacklist (Suppression)</span>
+                    </a>
+                </li>
+
                 <?php if (!$isAdmin) : ?>
                 <li class="nav-item <?= ($activeMenu == 'smtp' && !in_array('admin', $segments)) ? 'active' : '' ?>">
                     <a class="nav-link" href="<?= url_to('app.smtp') ?>">

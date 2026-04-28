@@ -56,6 +56,11 @@ $routes->group('', ['filter' => 'auth'], static function ($routes) {
     $routes->get('automations/status/(:num)/(:any)', 'User\AutomationController::updateStatus/$1/$2', ['as' => 'user.automations.status']);
 
     $routes->get('reports', 'User\ReportController::index', ['as' => 'user.reports']);
+    
+    // Suppression List (Daftar Hitam)
+    $routes->get('suppressions', 'SuppressionController::index', ['as' => 'app.suppressions']);
+    $routes->post('suppressions/store', 'SuppressionController::store', ['as' => 'app.suppressions.store']);
+    $routes->delete('suppressions/delete/(:num)', 'SuppressionController::delete/$1', ['as' => 'app.suppressions.delete']);
 
     $routes->get('smtp', 'User\SmtpController::index', ['as' => 'app.smtp']);
     $routes->get('smtp/new', 'User\SmtpController::create', ['as' => 'app.smtp.create']);
