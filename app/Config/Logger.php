@@ -41,6 +41,19 @@ class Logger extends BaseConfig
      */
     public $threshold = (ENVIRONMENT === 'production') ? 4 : 9;
 
+    public function __construct()
+    {
+        parent::__construct();
+
+        /**
+         * 🔥 CUSTOM HANDLER: Konversi string dari .env (misal: "1,2,3,4,7")
+         * menjadi array agar logger CI4 bisa memproses level spesifik.
+         */
+        if (is_string($this->threshold) && strpos($this->threshold, ',') !== false) {
+            $this->threshold = array_map('intval', explode(',', $this->threshold));
+        }
+    }
+
     /**
      * --------------------------------------------------------------------------
      * Date Format for Logs

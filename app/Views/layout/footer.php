@@ -4,7 +4,6 @@
             <div class="col-lg-auto ms-lg-auto">
                 <ul class="list-inline list-inline-dots mb-0 small text-muted">
                     <li class="list-inline-item">v1.0.0-stable</li>
-                    <li class="list-inline-item">Engine: CI4</li>
                 </ul>
             </div>
             <div class="col-12 col-lg-auto mt-3 mt-lg-0">
