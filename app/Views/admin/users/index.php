@@ -26,8 +26,9 @@
                     <th>Pengguna</th>
                     <th>Role</th>
                     <th>Status Akun</th>
+                    <th>Last Login</th>
                     <th>Terdaftar</th>
-                    <th class="w-1">Aksi</th>
+                    <th class="w-1 text-center">Aksi</th>
                 </tr>
             </thead>
             <tbody>
@@ -55,24 +56,64 @@
                             <span class="status status-green"><span class="status-dot"></span> Aktif</span>
                         <?php endif ?>
                     </td>
+                    <td class="small text-muted">
+                        <?php 
+                            $lastLogin = $user->lastLogin(); 
+                            echo $lastLogin ? $lastLogin->date->humanize() : '<span class="text-warning">Belum pernah</span>';
+                        ?>
+                    </td>
                     <td class="text-muted small"><?= $user->created_at->toFormattedDateString() ?></td>
                     <td>
-                        <?php if ($user->id !== auth()->id()) : ?>
-                            <form action="<?= site_url('admin/users/toggle/' . $user->id) ?>" method="POST" class="d-inline" id="toggle-form-<?= $user->id ?>">
-                                <?= csrf_field() ?>
-                                <button type="button" class="btn btn-sm btn-<?= $user->isBanned() ? 'success' : 'outline-danger' ?>"
+                        <div class="d-flex align-items-center gap-2">
+
+                            <?php if ($user->id !== auth()->id()) : ?>
+
+                                <!-- Toggle -->
+                                <form action="<?= site_url('admin/users/toggle/' . $user->id) ?>" method="POST" id="toggle-form-<?= $user->id ?>">
+                                    <?= csrf_field() ?>
+                                    <button type="button"
+                                        class="btn btn-icon btn-sm <?= $user->isBanned() ? 'btn-outline-success' : 'btn-outline-warning' ?>"
+                                        title="<?= $user->isBanned() ? 'Aktifkan' : 'Blokir' ?>"
                                         onclick="confirmAction({
                                             title: '<?= $user->isBanned() ? 'Aktifkan Pengguna?' : 'Blokir Pengguna?' ?>',
-                                            text: '<?= $user->isBanned() ? 'Pengguna ini akan bisa kembali login dan menggunakan sistem.' : 'Pengguna ini tidak akan bisa login sampai diaktifkan kembali.' ?>',
-                                            type: '<?= $user->isBanned() ? 'success' : 'danger' ?>',
+                                            text: '<?= $user->isBanned() ? 'Pengguna bisa login kembali.' : 'Pengguna tidak bisa login sementara.' ?>',
+                                            type: '<?= $user->isBanned() ? 'success' : 'warning' ?>',
                                             onConfirm: () => document.getElementById('toggle-form-<?= $user->id ?>').submit()
                                         })">
-                                    <?= $user->isBanned() ? 'Aktifkan' : 'Blokir' ?>
+                                        <i class="ti ti-<?= $user->isBanned() ? 'lock-open' : 'user-x' ?>"></i>
+                                    </button>
+                                </form>
+
+                                <!-- Copy -->
+                                <button type="button"
+                                    class="btn btn-icon btn-sm btn-outline-secondary"
+                                    onclick="copyMagicLink(this, <?= $user->id ?>)"
+                                    title="Copy Magic Link">
+                                    <i class="ti ti-copy"></i>
                                 </button>
-                            </form>
-                        <?php else : ?>
-                            <span class="text-muted small">Anda</span>
-                        <?php endif ?>
+
+                                <!-- Delete -->
+                                <form action="<?= site_url('admin/users/delete/' . $user->id) ?>" method="POST" id="delete-form-<?= $user->id ?>">
+                                    <?= csrf_field() ?>
+                                    <button type="button"
+                                        class="btn btn-icon btn-sm btn-outline-danger"
+                                        title="Hapus"
+                                        onclick="confirmAction({
+                                            title: 'Hapus Pengguna?',
+                                            text: 'Data disembunyikan, histori tetap tersimpan.',
+                                            type: 'danger',
+                                            confirmText: 'Ya, Hapus',
+                                            onConfirm: () => document.getElementById('delete-form-<?= $user->id ?>').submit()
+                                        })">
+                                        <i class="ti ti-trash"></i>
+                                    </button>
+                                </form>
+
+                            <?php else : ?>
+                                <span class="badge bg-blue-lt">Akun Anda</span>
+                            <?php endif ?>
+
+                        </div>
                     </td>
                 </tr>
                 <?php endforeach ?>
@@ -83,6 +124,70 @@
         <?= $pager->links('default', 'tabler_pagination') ?>
     </div>
 </div>
+
+<!-- Script untuk Copy Magic Link -->
+<script>
+async function copyMagicLink(btn, userId) {
+    const originalHtml = btn.innerHTML;
+    
+    // Set Loading State
+    btn.disabled = true;
+    btn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span> Loading...';
+
+    try {
+        const response = await fetch(`<?= site_url('admin/users/magic-link/') ?>${userId}`);
+        const data = await response.json();
+        
+        if (data.success) {
+            const textToCopy = data.link;
+
+            // Fallback Clipboard Logic
+            if (navigator.clipboard && window.isSecureContext) {
+                // Cara modern (HTTPS)
+                await navigator.clipboard.writeText(textToCopy);
+            } else {
+                // Cara lama (Fallback untuk HTTP/Non-Secure)
+                const textArea = document.createElement("textarea");
+                textArea.value = textToCopy;
+                textArea.style.position = "fixed";
+                textArea.style.left = "-999999px";
+                textArea.style.top = "-999999px";
+                document.body.appendChild(textArea);
+                textArea.focus();
+                textArea.select();
+                try {
+                    document.execCommand('copy');
+                } catch (err) {
+                    console.error('Fallback copy failed', err);
+                }
+                textArea.remove();
+            }
+            
+            if (typeof window.showAlert === 'function') {
+                window.showAlert('Berhasil!', 'Magic link sudah tersalin ke clipboard.', 'success');
+            } else {
+                alert('Magic link berhasil disalin!');
+            }
+        } else {
+            if (typeof window.showAlert === 'function') {
+                window.showAlert('Gagal!', data.message || 'Gagal mengambil link.', 'danger');
+            } else {
+                alert('Error: ' + (data.message || 'Gagal mengambil link.'));
+            }
+        }
+    } catch (error) {
+        console.error('Error:', error);
+        if (typeof window.showAlert === 'function') {
+            window.showAlert('System Error', 'Gagal menghubungi server.', 'danger');
+        } else {
+            alert('Terjadi kesalahan sistem.');
+        }
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHtml;
+    }
+}
+</script>
 
 <!-- Modal Tambah Pengguna -->
 <div class="modal modal-blur fade" id="modal-add-user" tabindex="-1" role="dialog" aria-hidden="true">

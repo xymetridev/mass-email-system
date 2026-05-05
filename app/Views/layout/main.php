@@ -6,12 +6,30 @@
     <title><?= esc($pageTitle ?? 'Dashboard') ?> | Mass Email System</title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta21/dist/css/tabler.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+    <link rel="icon" type="image/svg+xml" href="<?= base_url('favicon.svg') ?>?v=2">
     <style>
         @import url('https://rsms.me/inter/inter.css');
         :root { --tblr-font-sans-serif: 'Inter Var', -apple-system, BlinkMacSystemFont, San Francisco, Segoe UI, Roboto, Helvetica Neue, sans-serif; }
         body { font-feature-settings: "cv03", "cv04", "cv11"; }
         .page-wrapper { min-height: 100vh; display: flex; flex-direction: column; }
         .footer { margin-top: auto; }
+        
+        /* 🔥 Fix ApexCharts Tooltip in Dark Mode */
+        [data-bs-theme='dark'] .apexcharts-tooltip {
+            background: #1d273b !important;
+            color: #ffffff !important;
+            border: 1px solid #2d394f !important;
+            box-shadow: none !important;
+        }
+        [data-bs-theme='dark'] .apexcharts-tooltip-title {
+            background: #243049 !important;
+            border-bottom: 1px solid #2d394f !important;
+            color: #ffffff !important;
+        }
+        [data-bs-theme='dark'] .apexcharts-tooltip-text-label, 
+        [data-bs-theme='dark'] .apexcharts-tooltip-text-value {
+            color: #ffffff !important;
+        }
     </style>
     <script>
         (function () {

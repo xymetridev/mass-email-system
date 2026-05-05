@@ -7,6 +7,7 @@
     <title><?= $this->renderSection('title') ?></title>
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/core@1.0.0-beta21/dist/css/tabler.min.css">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@2.47.0/tabler-icons.min.css">
+    <link rel="icon" type="image/svg+xml" href="<?= base_url('favicon.svg') ?>?v=2">
     <script>
         (function () {
             const key = 'mes-theme';

@@ -5,6 +5,9 @@ namespace App\Controllers\Admin;
 use App\Controllers\BaseController;
 use CodeIgniter\Shield\Models\UserModel;
 use CodeIgniter\Shield\Entities\User;
+use CodeIgniter\Shield\Models\UserIdentityModel;
+use CodeIgniter\Shield\Authentication\Authenticators\Session;
+use CodeIgniter\I18n\Time;
 
 class Users extends BaseController
 {
@@ -14,7 +17,6 @@ class Users extends BaseController
         
         $data = [
             'pageTitle' => 'Manajemen Pengguna',
-            // Kita ambil user beserta grupnya
             'users'     => $userModel->orderBy('created_at', 'DESC')->paginate(10),
             'pager'     => $userModel->pager,
         ];
@@ -37,8 +39,6 @@ class Users extends BaseController
 
         $userModel = new UserModel();
         
-        // Buat entitas user dengan password super acak agar aman
-        // Karyawan nantinya wajib menggunakan fitur "Magic Link" untuk login pertama kali
         $user = new User([
             'username' => $this->request->getPost('username'),
             'email'    => $this->request->getPost('email'),
@@ -47,23 +47,52 @@ class Users extends BaseController
 
         $userModel->save($user);
 
-        // Ambil ID user yang baru dibuat
         $userId = $userModel->getInsertID();
         $newUser = $userModel->findById($userId);
 
-        // Tambahkan user ke dalam grup/role yang dipilih
         $role = $this->request->getPost('role');
         $newUser->addGroup($role);
-        
-        // Aktifkan langsung akunnya (karena dibuat oleh admin, tidak perlu email aktivasi)
         $newUser->activate();
-
-        $newUser->forcePasswordReset();
         $userModel->save($newUser);
+        $newUser->forcePasswordReset();
 
-        record_activity('ADMIN_CREATE_USER', "Admin membuat akun baru '{$newUser->username}' ({$newUser->email}) dengan role '{$role}'.");
+        // 🔥 LOGIKA GENERATE MAGIC LINK (Fix: Tanpa MagicLinkModel)
+        try {
+            /** @var UserIdentityModel $identityModel */
+            $identityModel = model(UserIdentityModel::class);
+            $identityModel->deleteIdentitiesByType($newUser, Session::ID_TYPE_MAGIC_LINK);
 
-        return redirect()->back()->with('success', "Akun {$newUser->username} berhasil dibuat. Silakan instruksikan user untuk login via Magic Link.");
+            helper('text');
+            $token = random_string('crypto', 20);
+
+            $identityModel->insert([
+                'user_id' => $newUser->id,
+                'type'    => Session::ID_TYPE_MAGIC_LINK,
+                'secret'  => $token,
+                'expires' => Time::now()->addSeconds(setting('Auth.magicLinkLifetime')),
+            ]);
+            
+            $email = \Config\Services::email();
+            $email->setTo($newUser->email);
+            $email->setSubject(lang('Auth.magicLinkSubject'));
+            $email->setMessage(view(config('Auth')->views['magic-link-email'], [
+                'token' => $token,
+                'user'  => $newUser,
+            ]));
+
+            if ($email->send()) {
+                record_activity('ADMIN_CREATE_USER', "Admin membuat akun baru '{$newUser->username}' ({$newUser->email}) dan mengirimkan undangan Magic Link.");
+                $message = "Akun {$newUser->username} berhasil dibuat dan email undangan Magic Link telah dikirim.";
+            } else {
+                $message = "Akun {$newUser->username} berhasil dibuat, namun GAGAL mengirim email undangan. Silakan cek log sistem.";
+                log_message('error', "Gagal mengirim Magic Link ke {$newUser->email}. Debug: " . $email->printDebugger(['headers', 'subject']));
+            }
+        } catch (\Exception $e) {
+            log_message('error', "Exception saat mengirim Magic Link: " . $e->getMessage());
+            $message = "Akun {$newUser->username} berhasil dibuat, tapi sistem gagal memproses pengiriman email.";
+        }
+
+        return redirect()->back()->with('success', $message);
     }
 
     // Fitur untuk Ban/Unban User (Keamanan)
@@ -81,5 +110,71 @@ class Users extends BaseController
         $user->ban();
         record_activity('BAN_USER', "Menonaktifkan akun '{$user->username}'.");
         return redirect()->back()->with('success', "Akun {$user->username} berhasil dinonaktifkan.");
+    }
+
+    /**
+     * 🔥 Soft Delete User
+     */
+    public function delete($id)
+    {
+        $userModel = new UserModel();
+        $user = $userModel->find($id);
+
+        if (!$user) {
+            return redirect()->back()->with('error', 'User tidak ditemukan.');
+        }
+
+        if ($user->id === auth()->id()) {
+            return redirect()->back()->with('error', 'Anda tidak bisa menghapus akun sendiri!');
+        }
+
+        $userModel->delete($user->id);
+        
+        record_activity('DELETE_USER', "Menghapus (soft-delete) akun '{$user->username}'.");
+
+        return redirect()->back()->with('success', "Akun {$user->username} berhasil dihapus.");
+    }
+
+    /**
+     * 🔥 API Fallback: Generate Magic Link untuk dicopy Admin (Fixed Version)
+     */
+    public function getMagicLink($id)
+    {
+        $userModel = new UserModel();
+        $user = $userModel->find($id);
+
+        if (!$user) {
+            return $this->response->setJSON(['success' => false, 'message' => 'User tidak ditemukan.']);
+        }
+
+        try {
+            /** @var UserIdentityModel $identityModel */
+            $identityModel = model(UserIdentityModel::class);
+            $identityModel->deleteIdentitiesByType($user, Session::ID_TYPE_MAGIC_LINK);
+
+            helper('text');
+            $token = random_string('crypto', 20);
+
+            $identityModel->insert([
+                'user_id' => $user->id,
+                'type'    => Session::ID_TYPE_MAGIC_LINK,
+                'secret'  => $token,
+                'expires' => Time::now()->addSeconds(setting('Auth.magicLinkLifetime')),
+            ]);
+            
+            $link = url_to('verify-magic-link') . "?token={$token}";
+
+            record_activity('ADMIN_GET_MAGIC_LINK', "Admin mengambil manual Magic Link untuk user '{$user->username}'.");
+
+            return $this->response->setJSON([
+                'success' => true,
+                'link'    => $link
+            ]);
+        } catch (\Exception $e) {
+            return $this->response->setJSON([
+                'success' => false, 
+                'message' => 'Gagal generate link: ' . $e->getMessage()
+            ]);
+        }
     }
 }

@@ -72,7 +72,7 @@ class Dashboard extends BaseController
         $data['chartSent'] = json_encode($chartSent);
         $data['chartOpens'] = json_encode($chartOpens);
 
-        $data['pageTitle'] = 'Admin / Pusat Komando';
+        $data['pageTitle'] = 'Dashboard';
 
         return view('admin/dashboard', $data);
     }

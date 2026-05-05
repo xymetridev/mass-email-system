@@ -57,6 +57,18 @@
                     <?= csrf_field() ?>
                     
                     <div class="mb-3">
+                        <label class="form-label">Password Saat Ini</label>
+                        <div class="input-group input-group-flat">
+                            <input type="password" name="current_password" id="pass-0" class="form-control" placeholder="Masukkan password saat ini" autocomplete="off">
+                            <span class="input-group-text">
+                                <a href="javascript:void(0)" class="link-secondary" title="Show password" onclick="togglePassword('pass-0', this)">
+                                    <i class="ti ti-eye"></i>
+                                </a>
+                            </span>
+                        </div>
+                    </div>
+
+                    <div class="mb-3">
                         <label class="form-label">Password Baru</label>
                         <div class="input-group input-group-flat">
                             <input type="password" name="new_password" id="pass-1" class="form-control" placeholder="Minimal 8 karakter" autocomplete="off">

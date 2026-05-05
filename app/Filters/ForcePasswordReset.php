@@ -14,7 +14,7 @@ class ForcePasswordReset implements FilterInterface
             $user = auth()->user();
             
             // Check if user is forced to reset password
-            if ($user->forcePasswordReset) {
+            if ($user->requiresPasswordReset()) {
                 // If they are not already on the set-password or logout page, redirect them
                 $currentUri = (string) current_url(true)->setQuery('');
                 

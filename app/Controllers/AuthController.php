@@ -13,7 +13,7 @@ class AuthController extends BaseController
     public function setPasswordView()
     {
         // Pastikan user memang butuh reset password
-        if (! auth()->user()->forcePasswordReset) {
+        if (! auth()->user()->requiresPasswordReset()) {
             return redirect()->to('/');
         }
 
@@ -39,13 +39,11 @@ class AuthController extends BaseController
         $userModel = new UserModel();
         $user = auth()->user();
 
-        // Update password dan matikan flag forcePasswordReset
         $user->password = $this->request->getPost('password');
         
-        // Di Shield, kita bisa mematikan flag ini secara manual
-        $user->forcePasswordReset = false;
-        
         if ($userModel->save($user)) {
+            // Di Shield, kita mematikan flag ini lewat method bawaannya
+            $user->undoForcePasswordReset();
             return redirect()->to('/')->with('success', 'Password berhasil disimpan. Selamat datang di Dashboard!');
         }
 

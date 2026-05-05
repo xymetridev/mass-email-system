@@ -103,7 +103,9 @@
 <script src="https://cdn.jsdelivr.net/npm/apexcharts"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function () {
-        window.ApexCharts && (new ApexCharts(document.getElementById('chart-performance'), {
+        const getTheme = () => document.documentElement.getAttribute('data-bs-theme') === 'dark' ? 'dark' : 'light';
+        
+        const chartPerformance = new ApexCharts(document.getElementById('chart-performance'), {
             chart: {
                 type: "area",
                 fontFamily: 'inherit',
@@ -111,6 +113,9 @@
                 parentHeightOffset: 0,
                 toolbar: { show: false },
                 animations: { enabled: true },
+            },
+            theme: {
+                mode: getTheme(),
             },
             dataLabels: { enabled: false },
             fill: { opacity: .16, type: 'solid' },
@@ -143,7 +148,19 @@
                 markers: { width: 10, height: 10, radius: 100 },
                 itemMargin: { horizontal: 8, vertical: 8 },
             },
-        })).render();
+        });
+        
+        chartPerformance.render();
+
+        // 🔥 Real-time Theme Switcher untuk Chart
+        const observer = new MutationObserver(() => {
+            const newTheme = getTheme();
+            chartPerformance.updateOptions({
+                theme: { mode: newTheme },
+                tooltip: { theme: newTheme } // Paksa tooltip ganti tema
+            });
+        });
+        observer.observe(document.documentElement, { attributes: true, attributeFilter: ['data-bs-theme'] });
     });
 
     function refreshStats() {

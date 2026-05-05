@@ -34,23 +34,29 @@ class UserController extends BaseController
     }
 
     public function changePassword()
-        {
-            $rules = [
-                'password'     => 'required|strong_password',
-                'new_password' => 'required|min_length[8]',
-                'confirm_pw'   => 'required|matches[new_password]',
-            ];
+    {
+        $rules = [
+            'current_password' => 'required',
+            'new_password'     => 'required|min_length[8]|strong_password',
+            'confirm_pw'       => 'required|matches[new_password]',
+        ];
 
-            if (! $this->validate($rules)) {
-                return redirect()->back()->with('errors', $this->validator->getErrors());
-            }
-
-            $user = auth()->user();
-            $user->password = $this->request->getPost('new_password');
-            
-            $users = model('UserModel');
-            $users->save($user);
-
-            return redirect()->back()->with('success', 'Password berhasil diperbarui.');
+        if (! $this->validate($rules)) {
+            return redirect()->back()->with('errors', $this->validator->getErrors());
         }
+
+        $user = auth()->user();
+        
+        // Verifikasi password saat ini
+        if (! $user->checkPassword($this->request->getPost('current_password'))) {
+            return redirect()->back()->with('errors', ['current_password' => 'Password saat ini tidak valid.']);
+        }
+
+        $user->password = $this->request->getPost('new_password');
+        
+        $users = model('UserModel');
+        $users->save($user);
+
+        return redirect()->back()->with('success', 'Password berhasil diperbarui.');
+    }
 }

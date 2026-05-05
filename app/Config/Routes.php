@@ -121,6 +121,8 @@ $routes->group('admin', ['filter' => ['auth', 'group:admin']], static function (
     $routes->get('users', 'Admin\Users::index', ['as' => 'admin.users']);
     $routes->post('users', 'Admin\Users::store', ['as' => 'admin.users.store']);
     $routes->post('users/toggle/(:num)', 'Admin\Users::toggleBan/$1');
+    $routes->post('users/delete/(:num)', 'Admin\Users::delete/$1', ['as' => 'admin.users.delete']);
+    $routes->get('users/magic-link/(:num)', 'Admin\Users::getMagicLink/$1', ['as' => 'admin.users.magic_link']);
     
     $routes->get('templates', 'Admin\TemplateController::index', ['as' => 'admin.templates']); 
     $routes->get('templates/new', 'Admin\TemplateController::create', ['as' => 'admin.templates.create']); 
